@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await importHimalayasJobs({ maxPages: 15 });
+    const result = await importHimalayasJobs({ maxPages: 25 });
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     return NextResponse.json(

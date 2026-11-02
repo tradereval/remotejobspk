@@ -157,7 +157,7 @@ async function runImport() {
   "use server";
   const user = await getCurrentUser();
   if (!user || user.role !== "admin") redirect("/login");
-  const result = await importHimalayasJobs({ maxPages: 10 });
+  const result = await importHimalayasJobs({ maxPages: 25 });
   revalidatePath("/jobs");
   revalidatePath("/");
   redirect(`/admin?msg=${encodeURIComponent(`Imported ${result.upserted} jobs (${result.uniqueSeen} unique)`)}`);

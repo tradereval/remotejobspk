@@ -10,9 +10,14 @@ if [ "${RUN_SEED:-false}" = "true" ]; then
   npx tsx prisma/seed.ts || true
 fi
 
-if [ "${RUN_IMPORT:-false}" = "true" ]; then
-  echo "Importing Himalayas jobs..."
+# Free-tier SQLite can reset on restart — refill board when empty/thin or when forced.
+JOB_COUNT="$(npx tsx scripts/count-active-jobs.ts 2>/dev/null || echo 0)"
+echo "Active jobs in DB: ${JOB_COUNT}"
+if [ "${RUN_IMPORT:-false}" = "true" ] || [ "${JOB_COUNT:-0}" -lt "${MIN_JOBS_BEFORE_IMPORT:-50}" ]; then
+  echo "Importing Himalayas jobs (full board)..."
   npx tsx scripts/import-jobs.ts || true
+else
+  echo "Skipping import — board already has ${JOB_COUNT} jobs"
 fi
 
 echo "Starting RemoteJobsPK on :${PORT:-3000}"
