@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build --webpack --experimental-build-mode compile",
-    "build:full": "prisma generate && next build --webpack",
-    "build:check": "prisma generate && next build --webpack --experimental-build-mode compile",
+    "build": "prisma generate && next build --webpack",
+    "build:compile": "prisma generate && next build --webpack --experimental-build-mode compile",
+    "build:check": "prisma generate && next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "db:migrate": "prisma migrate dev",

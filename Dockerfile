@@ -14,8 +14,8 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 RUN npx prisma generate
-# Avoid Next 16 /_global-error prerender flake on Windows/CI
-RUN npx next build --webpack --experimental-build-mode compile
+# Full build required — compile-only mode ships fonts/CSS stubs without Tailwind utilities
+RUN npx next build --webpack
 
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
