@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f3f6f8;
+  --panel: #e8eef2;
+  --ink: #0b1f33;
+  --muted: #5b6b7c;
+  --accent: #0f7a5a;
+  --accent-2: #c45c26;
+  --line: #c9d5df;
+  --hero: #0b1f33;
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--ink);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+}
+
+body {
+  background:
+    radial-gradient(1200px 500px at 10% -10%, rgba(15, 122, 90, 0.12), transparent 55%),
+    radial-gradient(900px 400px at 100% 0%, rgba(196, 92, 38, 0.1), transparent 50%),
+    var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+a {
+  text-decoration: none;
+}
+
+.prose-job h1,
+.prose-job h2,
+.prose-job h3 {
+  font-family: var(--font-display), system-ui, sans-serif;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.prose-job p,
+.prose-job li {
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.prose-job ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}

@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String         @id @default(cuid())
+  email        String         @unique
+  passwordHash String
+  name         String?
+  role         String         @default("user") // user | admin
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  subscription Subscription?
+  savedJobs    SavedJob[]
+  savedSearches SavedSearch[]
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status               String    @default("inactive") // inactive | active | canceled | past_due
+  plan                 String? // premium_pkr | premium_usd
+  currency             String?
+  safepayCustomerId    String?
+  safepaySubscriptionId String?
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+model Job {
+  id                String     @id @default(cuid())
+  source            String // himalayas | manual
+  externalId        String?
+  title             String
+  company           String
+  companyLogo       String?
+  description       String?
+  excerpt           String?
+  applicationUrl    String
+  sourceAttributionUrl String?
+  salaryMin         Int?
+  salaryMax         Int?
+  salaryCurrency    String?
+  salaryPeriod      String?
+  seniority         String?
+  categories        String     @default("[]") // JSON array
+  skills            String     @default("[]") // JSON array
+  eligibility       String     @default("unknown") // pakistan | worldwide | restricted | unknown
+  acceptsBeginners  Boolean    @default(false)
+  isVerified        Boolean    @default(false)
+  needsReview       Boolean    @default(true)
+  publishedAt       DateTime?
+  expiresAt         DateTime?
+  isActive          Boolean    @default(true)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  savedBy           SavedJob[]
+
+  @@unique([source, externalId])
+  @@index([isActive, eligibility])
+  @@index([isVerified])
+  @@index([publishedAt])
+}
+
+model SavedJob {
+  id        String   @id @default(cuid())
+  userId    String
+  jobId     String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, jobId])
+}
+
+model SavedSearch {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String?
+  queryJson       String // JSON filters
+  alertFrequency  String   @default("daily") // off | daily | instant
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}

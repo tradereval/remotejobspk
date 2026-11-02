@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: remotejobspk
+    runtime: docker
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: file:/data/prod.db
+      - key: NEXT_PUBLIC_SITE_NAME
+        value: RemoteJobsPK
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        value: admin@remotejobspk.com
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: RUN_SEED
+        value: "true"
+      - key: RUN_IMPORT
+        value: "true"
+    disk:
+      name: remotejobspk-data
+      mountPath: /data
+      sizeGB: 1
