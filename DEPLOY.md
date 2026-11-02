@@ -82,9 +82,20 @@ After 12 hours, or with a **different phone**, or GitHub login if Vercel allows 
 - http://localhost:3000  
 - `admin@remotejobspk.com` / `admin123456` — **change before public**
 
+## Spreadsheet CRM (signups + paying customers)
+
+1. Create a Google Sheet → tab name `Leads`  
+2. Paste `scripts/google-apps-script-leads.gs` into **Extensions → Apps Script**  
+3. Deploy as **Web app** (Execute as Me, Anyone)  
+4. Set Render env `LEADS_SHEET_WEBHOOK_URL` to that URL  
+5. New signups, profile updates, and Premium grants append rows automatically  
+6. Backup anytime: Admin → **Download CSV**
+
 ## Still on you
 
 1. Render (or Railway) account + GitHub push  
 2. Squarespace DNS edit after you have the host URL  
 3. Finish Google Workspace email for `hello@remotejobspk.com`  
 4. Safepay for paid subscriptions later  
+5. Paste Apps Script webhook URL into Render env for live CRM sync  
+

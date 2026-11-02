@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSession, getCurrentUser, hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { syncLeadToSpreadsheet, userToLeadPayload } from "@/lib/leads-sheet";
 
 export default async function SignupPage({
   searchParams,
@@ -123,7 +124,9 @@ async function signupAction(formData: FormData) {
       passwordHash: await hashPassword(password),
       subscription: { create: { status: "inactive" } },
     },
+    include: { subscription: true },
   });
+  await syncLeadToSpreadsheet(userToLeadPayload(user, "signup", "New free signup"));
   await createSession(user);
   redirect(`/jobs?q=${encodeURIComponent(specialty)}`);
 }

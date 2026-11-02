@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser, isPremium } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { syncLeadToSpreadsheet, userToLeadPayload } from "@/lib/leads-sheet";
 
 export default async function AccountPage() {
   const user = await getCurrentUser();
@@ -166,10 +167,12 @@ async function updateProfileAction(formData: FormData) {
     redirect("/account");
   }
 
-  await prisma.user.update({
+  const updated = await prisma.user.update({
     where: { id: user.id },
     data: { name, phone, city, state, qualification, specialty },
+    include: { subscription: true },
   });
+  await syncLeadToSpreadsheet(userToLeadPayload(updated, "profile_update", "Profile updated"));
   revalidatePath("/account");
   revalidatePath("/jobs");
   redirect("/account");

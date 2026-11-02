@@ -20,26 +20,28 @@ export default async function HomePage() {
           }}
         />
         <div className="relative mx-auto max-w-6xl px-4 py-20 sm:py-28">
-          <p className="mb-4 text-sm uppercase tracking-[0.2em] text-white/70">RemoteJobsPK</p>
+          <p className="mb-4 text-sm uppercase tracking-[0.2em] text-white/70">
+            Screened remote jobs · Built for Pakistan
+          </p>
           <h1 className="max-w-3xl font-[family-name:var(--font-display)] text-4xl leading-tight sm:text-6xl">
-            Remote jobs you can actually apply for from Pakistan
+            Stop wasting weeks on jobs that never hire from Pakistan
           </h1>
           <p className="mt-5 max-w-2xl text-lg text-white/80">
-            We research worldwide and Pakistan-eligible openings, label eligibility honestly, and keep apply
-            links free. Premium unlocks verified filters and alerts.
+            Like FlexJobs, we screen. Unlike them, apply links stay free — and Premium is Rs 999 / $3, not
+            $25. Tell us your specialty; we match roles that actually fit.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
-              href="/jobs"
+              href="/signup"
               className="rounded-full bg-[var(--accent)] px-6 py-3 text-[var(--bg)] hover:brightness-110"
             >
-              Browse jobs
+              Create free profile
             </Link>
             <Link
-              href="/pricing"
+              href="/jobs"
               className="rounded-full border border-white/40 px-6 py-3 text-white hover:bg-white/10"
             >
-              Premium Rs 999 / $3
+              Browse jobs
             </Link>
           </div>
         </div>
@@ -51,6 +53,24 @@ export default async function HomePage() {
         <Stat label="Worldwide remote" value={stats.worldwide} />
       </section>
 
+      <section className="mx-auto max-w-6xl px-4 pb-10">
+        <h2 className="font-[family-name:var(--font-display)] text-3xl">How the business works</h2>
+        <div className="mt-6 grid gap-6 sm:grid-cols-3">
+          <Feature
+            title="1. Free to apply"
+            body="You never pay to open an apply link. Free accounts browse, filter by eligibility, and apply direct."
+          />
+          <Feature
+            title="2. Premium for speed"
+            body="Pay for verified-only filters, beginner-friendly roles, and (soon) daily alerts — the same ‘save my time’ model as FlexJobs, priced for PK."
+          />
+          <Feature
+            title="3. We keep a CRM"
+            body="Every signup (name, phone, city, specialty) and every paying customer lands in our spreadsheet so we can help people manually too."
+          />
+        </div>
+      </section>
+
       <section className="mx-auto max-w-6xl px-4 pb-16">
         <h2 className="font-[family-name:var(--font-display)] text-3xl">Why RemoteJobsPK</h2>
         <div className="mt-6 grid gap-6 sm:grid-cols-3">
@@ -59,12 +79,12 @@ export default async function HomePage() {
             body="Every role is labeled Pakistan, Worldwide, Restricted, or Unverified — so you stop wasting hours on US/EU-only posts."
           />
           <Feature
-            title="Direct apply"
-            body="Browse and apply for free. Himalayas-sourced jobs keep official apply links and attribution."
+            title="Profile matching"
+            body="We collect specialty, qualification, and city so the board (and our team) can point you at better-fit openings."
           />
           <Feature
-            title="Fresh board"
-            body="Dead jobs get delisted. New openings get categorized. Premium adds verified filters and daily alerts."
+            title="Honest Premium"
+            body="You’re not buying the job. You’re buying screening, filters, and alerts — Live vs Soon is labeled on Pricing."
           />
         </div>
       </section>

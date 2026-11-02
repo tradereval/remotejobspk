@@ -5,9 +5,21 @@ export default function PricingPage() {
     <div className="mx-auto max-w-5xl px-4 py-12">
       <h1 className="font-[family-name:var(--font-display)] text-4xl">Pricing</h1>
       <p className="mt-3 max-w-2xl text-[var(--muted)]">
-        Apply links stay free forever. Premium is for people who want stricter filters and alerts — not a
-        paywall on jobs.
+        Global boards (FlexJobs, Remotive Accelerator) charge ~$20–25/mo to save you from scams and junk.
+        We keep apply links free, and charge a Pakistan-friendly price for screening + smarter matching.
       </p>
+
+      <div className="mt-8 rounded-2xl border border-[var(--line)] bg-white/70 p-5">
+        <h2 className="font-[family-name:var(--font-display)] text-xl">Why people pay us</h2>
+        <ul className="mt-3 grid gap-2 text-sm text-[var(--muted)] sm:grid-cols-2">
+          <li>• Hours saved: we label Pakistan vs worldwide vs restricted up front</li>
+          <li>• Scam / junk reduction: verified-only filter (Premium)</li>
+          <li>• Better fit: profile (specialty, city, qualification) drives matching</li>
+          <li>• Alerts when the right roles appear (Premium — wiring next)</li>
+          <li>• Apply links stay free — we never paywall the application URL</li>
+          <li>• ~8× cheaper than FlexJobs monthly, built for PK seekers</li>
+        </ul>
+      </div>
 
       <div className="mt-10 grid gap-6 md:grid-cols-2">
         <Plan
@@ -17,8 +29,9 @@ export default function PricingPage() {
             { text: "Browse Pakistan + worldwide listings", status: "live" },
             { text: "Full job details + direct apply links", status: "live" },
             { text: "Search, eligibility & seniority filters", status: "live" },
+            { text: "Profile matching by specialty", status: "live" },
           ]}
-          cta={{ href: "/jobs", label: "Browse jobs" }}
+          cta={{ href: "/signup", label: "Create free account" }}
         />
         <Plan
           name="Premium"
@@ -26,14 +39,15 @@ export default function PricingPage() {
           highlight
           items={[
             { text: "Everything in Free", status: "live" },
-            { text: "Verified-only filter", status: "live" },
-            { text: "Accepts beginners filter", status: "live" },
+            { text: "Verified-only filter (skip weak listings)", status: "live" },
+            { text: "Accepts-beginners filter", status: "live" },
+            { text: "Priority in our CRM / outreach sheet", status: "live" },
             { text: "Daily email job alerts", status: "soon" },
             { text: "Saved searches", status: "soon" },
             { text: "Safepay self-serve checkout", status: "soon" },
           ]}
-          cta={{ href: "/signup", label: "Create free account first" }}
-          note="Premium filters work today once granted. Email alerts + Safepay checkout are next. Until checkout is live, email hello@remotejobspk.com or ask admin to grant 30 days."
+          cta={{ href: "/signup", label: "Start free — upgrade anytime" }}
+          note="Until Safepay is live: email hello@remotejobspk.com with JazzCash/bank proof, or ask admin to grant 30 days. Paying customers are logged to our spreadsheet CRM automatically."
         />
       </div>
     </div>

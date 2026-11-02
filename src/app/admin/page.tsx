@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { importHimalayasJobs } from "@/lib/himalayas";
 import { revalidatePath } from "next/cache";
+import { syncLeadToSpreadsheet, userToLeadPayload } from "@/lib/leads-sheet";
 
 export default async function AdminPage({
   searchParams,
@@ -102,7 +104,27 @@ export default async function AdminPage({
       </section>
 
       <section className="rounded-2xl border border-[var(--line)] bg-white/80 p-5">
-        <h2 className="font-[family-name:var(--font-display)] text-xl">Users / grant Premium</h2>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-[family-name:var(--font-display)] text-xl">Users / grant Premium</h2>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              Signups + paying customers sync to your spreadsheet when LEADS_SHEET_WEBHOOK_URL is set.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/api/admin/export-leads"
+              className="rounded-full border border-[var(--ink)] px-3 py-1.5 text-xs"
+            >
+              Download CSV
+            </Link>
+            <form action={syncAllLeads}>
+              <button type="submit" className="rounded-full bg-[var(--ink)] px-3 py-1.5 text-xs text-[var(--bg)]">
+                Sync all to Sheet
+              </button>
+            </form>
+          </div>
+        </div>
         <div className="mt-4 divide-y divide-[var(--line)]">
           {users.map((u) => (
             <div key={u.id} className="flex items-center justify-between gap-3 py-3">
@@ -172,8 +194,8 @@ async function hideJob(jobId: string) {
 
 async function grantPremium(userId: string) {
   "use server";
-  const user = await getCurrentUser();
-  if (!user || user.role !== "admin") redirect("/login");
+  const admin = await getCurrentUser();
+  if (!admin || admin.role !== "admin") redirect("/login");
   const end = new Date();
   end.setDate(end.getDate() + 30);
   await prisma.subscription.upsert({
@@ -192,7 +214,35 @@ async function grantPremium(userId: string) {
       currentPeriodEnd: end,
     },
   });
+  const paid = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { subscription: true },
+  });
+  if (paid) {
+    await syncLeadToSpreadsheet(
+      userToLeadPayload(paid, "premium_granted", "Admin granted Premium 30d"),
+    );
+  }
   revalidatePath("/admin");
+}
+
+async function syncAllLeads() {
+  "use server";
+  const admin = await getCurrentUser();
+  if (!admin || admin.role !== "admin") redirect("/login");
+  const users = await prisma.user.findMany({ include: { subscription: true } });
+  let ok = 0;
+  for (const u of users) {
+    const event =
+      u.subscription?.status === "active" ? "premium_granted" : "signup";
+    const res = await syncLeadToSpreadsheet(
+      userToLeadPayload(u, event, "Bulk sync from admin"),
+    );
+    if (res.ok) ok += 1;
+  }
+  redirect(
+    `/admin?msg=${encodeURIComponent(`Synced ${ok}/${users.length} users to spreadsheet`)}`,
+  );
 }
 
 async function uploadCsv(formData: FormData) {
