@@ -26,62 +26,18 @@ async function main() {
     },
   });
 
-  const samples = [
-    {
-      externalId: "seed-1",
-      title: "Remote Full-Stack Engineer",
-      company: "Sample Co",
-      applicationUrl: "https://example.com/apply/fullstack",
-      eligibility: "worldwide",
-      seniority: "mid",
-      description: "<p>Build product features for a distributed team. Pakistan applicants welcome.</p>",
-      isVerified: true,
-      needsReview: false,
-      categories: JSON.stringify(["Engineering", "Full-stack"]),
+  // Deactivate any leftover demo jobs that point at example.com
+  await prisma.job.updateMany({
+    where: {
+      OR: [
+        { applicationUrl: { contains: "example.com" } },
+        { source: "manual", externalId: { startsWith: "seed-" } },
+      ],
     },
-    {
-      externalId: "seed-2",
-      title: "Customer Support Specialist",
-      company: "HelpDesk Asia",
-      applicationUrl: "https://example.com/apply/support",
-      eligibility: "pakistan",
-      seniority: "entry",
-      description: "<p>Support customers across APAC. Explicitly hiring in Pakistan.</p>",
-      isVerified: true,
-      needsReview: false,
-      acceptsBeginners: true,
-      categories: JSON.stringify(["Support", "Customer Success"]),
-    },
-    {
-      externalId: "seed-3",
-      title: "Senior Product Designer",
-      company: "DesignLab",
-      applicationUrl: "https://example.com/apply/design",
-      eligibility: "worldwide",
-      seniority: "senior",
-      description: "<p>Lead product design for a SaaS platform. Work from anywhere.</p>",
-      isVerified: true,
-      needsReview: false,
-      categories: JSON.stringify(["Design", "Product"]),
-    },
-  ];
+    data: { isActive: false },
+  });
 
-  for (const sample of samples) {
-    await prisma.job.upsert({
-      where: { source_externalId: { source: "manual", externalId: sample.externalId } },
-      update: {},
-      create: {
-        source: "manual",
-        ...sample,
-        excerpt: sample.description.replace(/<[^>]+>/g, "").slice(0, 160),
-        publishedAt: new Date(),
-        isActive: true,
-        skills: JSON.stringify([]),
-      },
-    });
-  }
-
-  console.log(`Seeded admin ${admin.email} and ${samples.length} sample jobs`);
+  console.log(`Seeded admin ${admin.email} (no demo jobs — use Himalayas import)`);
 }
 
 main()

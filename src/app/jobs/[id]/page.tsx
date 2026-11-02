@@ -13,6 +13,8 @@ export default async function JobDetailPage({ params }: { params: Params }) {
 
   const categories = parseJsonArray(job.categories);
   const salary = formatSalary(job);
+  const isDemoApply =
+    /example\.(com|org|net)/i.test(job.applicationUrl) || job.externalId?.startsWith("seed-");
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -38,14 +40,24 @@ export default async function JobDetailPage({ params }: { params: Params }) {
           </div>
         )}
 
-        <a
-          href={job.applicationUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex rounded-full bg-[var(--accent)] px-6 py-3 text-[var(--bg)] hover:brightness-110"
-        >
-          Apply now
-        </a>
+        {isDemoApply ? (
+          <p className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            This was a demo listing with a placeholder apply link. Browse{" "}
+            <Link href="/jobs" className="underline">
+              real Himalayas jobs
+            </Link>{" "}
+            instead.
+          </p>
+        ) : (
+          <a
+            href={job.applicationUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex rounded-full bg-[var(--accent)] px-6 py-3 text-[var(--bg)] hover:brightness-110"
+          >
+            Apply now
+          </a>
+        )}
 
         {job.source === "himalayas" && (
           <p className="text-sm text-[var(--muted)]">

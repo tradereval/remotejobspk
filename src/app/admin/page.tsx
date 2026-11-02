@@ -51,11 +51,18 @@ export default async function AdminPage({
         <p className="mt-1 text-sm text-[var(--muted)]">
           Imports Pakistan + worldwide feeds, dedupes, expires dead listings.
         </p>
-        <form action={runImport} className="mt-4">
-          <button type="submit" className="rounded-full bg-[var(--ink)] px-4 py-2 text-[var(--bg)]">
-            Run import now
-          </button>
-        </form>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <form action={runImport}>
+            <button type="submit" className="rounded-full bg-[var(--ink)] px-4 py-2 text-[var(--bg)]">
+              Run import now
+            </button>
+          </form>
+          <form action={removeDemoJobs}>
+            <button type="submit" className="rounded-full border border-[var(--ink)] px-4 py-2 text-sm">
+              Hide example.com demo jobs
+            </button>
+          </form>
+        </div>
       </section>
 
       <section className="rounded-2xl border border-[var(--line)] bg-white/80 p-5">
@@ -187,6 +194,28 @@ async function runImport() {
   revalidatePath("/jobs");
   revalidatePath("/");
   redirect(`/admin?msg=${encodeURIComponent(`Imported ${result.upserted} jobs (${result.uniqueSeen} unique)`)}`);
+}
+
+async function removeDemoJobs() {
+  "use server";
+  const user = await getCurrentUser();
+  if (!user || user.role !== "admin") redirect("/login");
+  const result = await prisma.job.updateMany({
+    where: {
+      OR: [
+        { applicationUrl: { contains: "example.com" } },
+        { applicationUrl: { contains: "example.org" } },
+        { source: "manual", externalId: { startsWith: "seed-" } },
+        { company: "Sample Co" },
+      ],
+      isActive: true,
+    },
+    data: { isActive: false },
+  });
+  revalidatePath("/jobs");
+  revalidatePath("/");
+  revalidatePath("/admin");
+  redirect(`/admin?msg=${encodeURIComponent(`Hid ${result.count} demo jobs`)}`);
 }
 
 async function verifyJob(jobId: string, eligibility: string) {

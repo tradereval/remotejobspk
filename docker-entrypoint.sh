@@ -10,6 +10,10 @@ if [ "${RUN_SEED:-false}" = "true" ]; then
   npx tsx prisma/seed.ts || true
 fi
 
+# Never show placeholder apply links (example.com) on the public board
+echo "Deactivating demo/example.com jobs..."
+npx tsx scripts/deactivate-demo-jobs.ts || true
+
 # Free-tier SQLite can reset on restart — refill board when empty/thin or when forced.
 JOB_COUNT="$(npx tsx scripts/count-active-jobs.ts 2>/dev/null || echo 0)"
 echo "Active jobs in DB: ${JOB_COUNT}"

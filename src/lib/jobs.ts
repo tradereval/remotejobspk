@@ -8,6 +8,13 @@ export async function listJobs(filters: JobFilters, opts?: { premium?: boolean }
   const page = Math.max(1, filters.page || 1);
   const where: Prisma.JobWhereInput = {
     isActive: true,
+    // Hide placeholder docs-domain apply links from the public board
+    NOT: {
+      OR: [
+        { applicationUrl: { contains: "example.com" } },
+        { applicationUrl: { contains: "example.org" } },
+      ],
+    },
   };
 
   if (filters.q) {
@@ -60,12 +67,22 @@ export async function listJobs(filters: JobFilters, opts?: { premium?: boolean }
   };
 }
 
+const publicJobWhere: Prisma.JobWhereInput = {
+  isActive: true,
+  NOT: {
+    OR: [
+      { applicationUrl: { contains: "example.com" } },
+      { applicationUrl: { contains: "example.org" } },
+    ],
+  },
+};
+
 export async function getJobStats() {
   const [active, pakistan, worldwide, verified] = await Promise.all([
-    prisma.job.count({ where: { isActive: true } }),
-    prisma.job.count({ where: { isActive: true, eligibility: "pakistan" } }),
-    prisma.job.count({ where: { isActive: true, eligibility: "worldwide" } }),
-    prisma.job.count({ where: { isActive: true, isVerified: true } }),
+    prisma.job.count({ where: publicJobWhere }),
+    prisma.job.count({ where: { ...publicJobWhere, eligibility: "pakistan" } }),
+    prisma.job.count({ where: { ...publicJobWhere, eligibility: "worldwide" } }),
+    prisma.job.count({ where: { ...publicJobWhere, isVerified: true } }),
   ]);
   return { active, pakistan, worldwide, verified };
 }
