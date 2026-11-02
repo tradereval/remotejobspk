@@ -18,33 +18,22 @@ Vercel phone verification can block new accounts (`verification phone number has
 
 ## Path A — Render (recommended, no Vercel)
 
-### 1) Create account (no Vercel phone)
+**Code is already on GitHub:** https://github.com/tradereval/remotejobspk  
 
-1. Open https://dashboard.render.com/register  
-2. Prefer **Continue with GitHub** or **email/password** (avoid Google if that also forces phone).  
-3. Verify email if asked.
+Blueprint link (sign in with GitHub first):  
+https://dashboard.render.com/blueprint/new?repo=https%3A%2F%2Fgithub.com%2Ftradereval%2Fremotejobspk
 
-### 2) Get code onto GitHub
+### 1) Sign in to Render with GitHub
 
-From `remotejobspk/` (after Git is installed):
+1. Open the Blueprint link above  
+2. Click **GitHub** (not Google / not Vercel)  
+3. Approve access for the `tradereval` GitHub account  
 
-```bash
-git init
-git add .
-git commit -m "Initial RemoteJobsPK"
-# Create empty repo on GitHub, then:
-git remote add origin https://github.com/YOUR_USER/remotejobspk.git
-git branch -M main
-git push -u origin main
-```
+### 2) Deploy from Blueprint / Docker
 
-### 3) New Web Service on Render
-
-1. **New → Web Service** → connect the GitHub repo  
-2. Runtime: **Docker** (uses `Dockerfile`)  
-3. Instance: Free or starter  
-4. Disk: add a **persistent disk** mounted at `/data` (for SQLite)  
-5. Environment:
+1. Confirm `render.yaml` / Docker service `remotejobspk`  
+2. Disk at `/data` for SQLite  
+3. Environment:
 
 ```
 AUTH_SECRET=<long-random>
