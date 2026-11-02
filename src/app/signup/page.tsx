@@ -15,6 +15,10 @@ export default async function SignupPage({
   return (
     <div className="mx-auto max-w-md px-4 py-12">
       <h1 className="font-[family-name:var(--font-display)] text-3xl">Create account</h1>
+      <p className="mt-2 text-sm text-[var(--muted)]">
+        No confirmation email — you&apos;ll be signed in immediately. Free accounts can browse and apply;
+        Premium unlocks stricter filters.
+      </p>
       {sp.error && <p className="mt-3 text-sm text-rose-700">{sp.error}</p>}
       <form action={signupAction} className="mt-6 space-y-4">
         <input

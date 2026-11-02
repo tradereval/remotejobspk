@@ -75,18 +75,40 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
           <option value="senior">Senior</option>
           <option value="lead">Lead</option>
         </select>
-        {premium && (
-          <>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="verified" value="1" defaultChecked={sp.verified === "1"} />
-              Verified only
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="beginners" value="1" defaultChecked={sp.beginners === "1"} />
-              Accepts beginners
-            </label>
-          </>
-        )}
+        <label
+          className={`flex items-center gap-2 text-sm sm:col-span-2 ${premium ? "" : "opacity-60"}`}
+        >
+          <input
+            type="checkbox"
+            name="verified"
+            value="1"
+            disabled={!premium}
+            defaultChecked={premium && sp.verified === "1"}
+          />
+          Verified only
+          {!premium && (
+            <Link href="/pricing" className="rounded-full bg-[var(--panel)] px-2 py-0.5 text-xs text-[var(--accent)]">
+              Premium
+            </Link>
+          )}
+        </label>
+        <label
+          className={`flex items-center gap-2 text-sm sm:col-span-2 ${premium ? "" : "opacity-60"}`}
+        >
+          <input
+            type="checkbox"
+            name="beginners"
+            value="1"
+            disabled={!premium}
+            defaultChecked={premium && sp.beginners === "1"}
+          />
+          Accepts beginners
+          {!premium && (
+            <Link href="/pricing" className="rounded-full bg-[var(--panel)] px-2 py-0.5 text-xs text-[var(--accent)]">
+              Premium
+            </Link>
+          )}
+        </label>
         <button
           type="submit"
           className="rounded-xl bg-[var(--ink)] px-4 py-2 text-[var(--bg)] hover:bg-[var(--accent)] sm:col-span-4 sm:justify-self-start"
