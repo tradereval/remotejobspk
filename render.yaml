@@ -23,8 +23,10 @@ services:
         sync: false
       - key: RUN_SEED
         value: "true"
+      # Import runs in background on boot only when the board is thin / missing meta.
+      # Set true temporarily if you need a forced full refresh after deploy.
       - key: RUN_IMPORT
-        value: "true"
+        value: "false"
     disk:
       name: remotejobspk-data
       mountPath: /data
