@@ -107,7 +107,13 @@ export default async function AdminPage({
           {users.map((u) => (
             <div key={u.id} className="flex items-center justify-between gap-3 py-3">
               <div>
-                <p>{u.email}</p>
+                <p>
+                  {u.name || "—"} · {u.email}
+                </p>
+                <p className="text-xs text-[var(--muted)]">
+                  {u.phone || "no phone"} · {[u.city, u.state].filter(Boolean).join(", ") || "no city"} ·{" "}
+                  {u.qualification || "no qualification"} · {u.specialty || "no specialty"}
+                </p>
                 <p className="text-xs text-[var(--muted)]">
                   {u.role} · sub: {u.subscription?.status || "none"}
                 </p>

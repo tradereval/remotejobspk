@@ -8,16 +8,21 @@ datasource db {
 }
 
 model User {
-  id           String         @id @default(cuid())
-  email        String         @unique
-  passwordHash String
-  name         String?
-  role         String         @default("user") // user | admin
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  subscription Subscription?
-  savedJobs    SavedJob[]
-  savedSearches SavedSearch[]
+  id             String         @id @default(cuid())
+  email          String         @unique
+  passwordHash   String
+  name           String?
+  phone          String?
+  city           String?
+  state          String?
+  qualification  String?
+  specialty      String?
+  role           String         @default("user") // user | admin
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  subscription   Subscription?
+  savedJobs      SavedJob[]
+  savedSearches  SavedSearch[]
 }
 
 model Subscription {

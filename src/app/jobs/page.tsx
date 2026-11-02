@@ -18,9 +18,11 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
   const sp = await searchParams;
   const user = await getCurrentUser();
   const premium = await isPremium(user);
+  const suggestedQ = !sp.q && user?.specialty ? user.specialty : undefined;
+  const activeQ = sp.q || suggestedQ;
 
   const filters = {
-    q: sp.q,
+    q: activeQ,
     eligibility: (sp.eligibility as Eligibility | "pk_ready" | undefined) || "pk_ready",
     category: sp.category,
     seniority: sp.seniority,
@@ -38,6 +40,7 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
           <h1 className="font-[family-name:var(--font-display)] text-4xl">Remote jobs</h1>
           <p className="mt-2 text-[var(--muted)]">
             {total} openings · Pakistan-eligible and worldwide by default
+            {suggestedQ ? ` · matched to your specialty “${suggestedQ}”` : ""}
           </p>
         </div>
         {!premium && (
@@ -47,10 +50,19 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
         )}
       </div>
 
+      {user && (!user.specialty || !user.city) && (
+        <div className="mb-6 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-4 py-3 text-sm">
+          Complete your profile (city, qualification, specialty) so we can rank better fits.{" "}
+          <Link href="/account" className="font-medium text-[var(--accent)] underline">
+            Update profile
+          </Link>
+        </div>
+      )}
+
       <form className="mb-8 grid gap-3 rounded-2xl border border-[var(--line)] bg-white/70 p-4 sm:grid-cols-4">
         <input
           name="q"
-          defaultValue={sp.q || ""}
+          defaultValue={activeQ || ""}
           placeholder="Search title, company, skill"
           className="rounded-xl border border-[var(--line)] bg-white px-3 py-2 sm:col-span-2"
         />
