@@ -1,3 +1,5 @@
+import { prisma } from "./db";
+
 export type LeadEventType = "signup" | "profile_update" | "premium_granted" | "premium_paid";
 
 export type LeadPayload = {
@@ -16,40 +18,63 @@ export type LeadPayload = {
   notes?: string | null;
 };
 
-/** Append one CRM row to Google Sheets via Apps Script / Make / Zapier webhook. */
+/** Persist CRM event in DB always; also append to Google Sheet when webhook is configured. */
 export async function syncLeadToSpreadsheet(payload: LeadPayload): Promise<{ ok: boolean; skipped?: boolean }> {
+  let sheetSynced = false;
   const url = process.env.LEADS_SHEET_WEBHOOK_URL?.trim();
-  if (!url) {
-    console.warn("[leads-sheet] LEADS_SHEET_WEBHOOK_URL not set — skipping spreadsheet sync");
-    return { ok: false, skipped: true };
-  }
 
-  const body = {
-    ...payload,
-    at: payload.at || new Date().toISOString(),
-    source: "remotejobspk",
-  };
+  if (url) {
+    const body = {
+      ...payload,
+      at: payload.at || new Date().toISOString(),
+      source: "remotejobspk",
+    };
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(process.env.LEADS_SHEET_WEBHOOK_SECRET
+            ? { Authorization: `Bearer ${process.env.LEADS_SHEET_WEBHOOK_SECRET}` }
+            : {}),
+        },
+        body: JSON.stringify(body),
+      });
+      sheetSynced = res.ok;
+      if (!res.ok) {
+        console.error("[leads-sheet] webhook failed", res.status, await res.text().catch(() => ""));
+      }
+    } catch (err) {
+      console.error("[leads-sheet] webhook error", err);
+    }
+  } else {
+    console.warn("[leads-sheet] LEADS_SHEET_WEBHOOK_URL not set — storing lead in DB only");
+  }
 
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(process.env.LEADS_SHEET_WEBHOOK_SECRET
-          ? { Authorization: `Bearer ${process.env.LEADS_SHEET_WEBHOOK_SECRET}` }
-          : {}),
+    await prisma.leadEvent.create({
+      data: {
+        event: payload.event,
+        userId: payload.userId || null,
+        name: payload.name || null,
+        email: payload.email || null,
+        phone: payload.phone || null,
+        city: payload.city || null,
+        state: payload.state || null,
+        qualification: payload.qualification || null,
+        specialty: payload.specialty || null,
+        plan: payload.plan || null,
+        subscriptionStatus: payload.subscriptionStatus || null,
+        notes: payload.notes || null,
+        sheetSynced,
       },
-      body: JSON.stringify(body),
     });
-    if (!res.ok) {
-      console.error("[leads-sheet] webhook failed", res.status, await res.text().catch(() => ""));
-      return { ok: false };
-    }
-    return { ok: true };
   } catch (err) {
-    console.error("[leads-sheet] webhook error", err);
+    console.error("[leads-sheet] DB lead log failed", err);
     return { ok: false };
   }
+
+  return { ok: true, skipped: !url };
 }
 
 export function userToLeadPayload(

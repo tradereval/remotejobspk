@@ -128,5 +128,5 @@ async function signupAction(formData: FormData) {
   });
   await syncLeadToSpreadsheet(userToLeadPayload(user, "signup", "New free signup"));
   await createSession(user);
-  redirect(`/jobs?q=${encodeURIComponent(specialty)}`);
+  redirect("/jobs");
 }

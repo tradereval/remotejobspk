@@ -16,13 +16,17 @@ export default async function AdminPage({
   if (user.role !== "admin") redirect("/account");
   const sp = await searchParams;
 
-  const [active, needsReview, users] = await Promise.all([
+  const [active, needsReview, users, leadEvents] = await Promise.all([
     prisma.job.count({ where: { isActive: true } }),
     prisma.job.count({ where: { needsReview: true, isActive: true } }),
     prisma.user.findMany({
-      take: 20,
+      take: 50,
       orderBy: { createdAt: "desc" },
       include: { subscription: true },
+    }),
+    prisma.leadEvent.findMany({
+      take: 40,
+      orderBy: { createdAt: "desc" },
     }),
   ]);
 
@@ -100,6 +104,28 @@ export default async function AdminPage({
             </div>
           ))}
           {reviewJobs.length === 0 && <p className="text-sm text-[var(--muted)]">Queue empty.</p>}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-[var(--line)] bg-white/80 p-5">
+        <h2 className="font-[family-name:var(--font-display)] text-xl">CRM / signup log</h2>
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          Every signup is stored here even without Google Sheets. Sheet sync needs LEADS_SHEET_WEBHOOK_URL.
+        </p>
+        <div className="mt-4 max-h-80 space-y-2 overflow-y-auto text-sm">
+          {leadEvents.length === 0 && <p className="text-[var(--muted)]">No lead events yet.</p>}
+          {leadEvents.map((ev) => (
+            <div key={ev.id} className="rounded-xl border border-[var(--line)] px-3 py-2">
+              <p className="font-medium">
+                {ev.event} · {ev.name || "—"} · {ev.email || "—"}
+                {ev.sheetSynced ? " · sheet✓" : " · sheet pending"}
+              </p>
+              <p className="text-xs text-[var(--muted)]">
+                {ev.phone || "no phone"} · {[ev.city, ev.state].filter(Boolean).join(", ") || "—"} ·{" "}
+                {ev.specialty || "—"} · {ev.createdAt.toISOString()}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
 

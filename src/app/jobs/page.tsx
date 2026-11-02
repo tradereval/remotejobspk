@@ -18,8 +18,8 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
   const sp = await searchParams;
   const user = await getCurrentUser();
   const premium = await isPremium(user);
-  const suggestedQ = !sp.q && user?.specialty ? user.specialty : undefined;
-  const activeQ = sp.q || suggestedQ;
+  // Only filter when the user explicitly searched — never hide the full board automatically.
+  const activeQ = sp.q?.trim() || undefined;
 
   const filters = {
     q: activeQ,
@@ -40,7 +40,6 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
           <h1 className="font-[family-name:var(--font-display)] text-4xl">Remote jobs</h1>
           <p className="mt-2 text-[var(--muted)]">
             {total} openings · Pakistan-eligible and worldwide by default
-            {suggestedQ ? ` · matched to your specialty “${suggestedQ}”` : ""}
           </p>
         </div>
         {!premium && (
@@ -50,9 +49,22 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
         )}
       </div>
 
+      {user?.specialty && !activeQ && (
+        <div className="mb-6 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-sm">
+          Your specialty is <strong>{user.specialty}</strong>.{" "}
+          <Link
+            href={`/jobs?q=${encodeURIComponent(user.specialty)}`}
+            className="font-medium text-[var(--accent)] underline"
+          >
+            Show matching jobs
+          </Link>{" "}
+          or browse everything below.
+        </div>
+      )}
+
       {user && (!user.specialty || !user.city) && (
         <div className="mb-6 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-4 py-3 text-sm">
-          Complete your profile (city, qualification, specialty) so we can rank better fits.{" "}
+          Complete your profile (city, qualification, specialty) so we can suggest better fits.{" "}
           <Link href="/account" className="font-medium text-[var(--accent)] underline">
             Update profile
           </Link>
@@ -131,10 +143,33 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
 
       <div className="rounded-2xl border border-[var(--line)] bg-white/80 px-4">
         {jobs.length === 0 ? (
-          <p className="py-12 text-center text-[var(--muted)]">
-            No jobs yet. Run an import from Admin or{" "}
-            <code className="rounded bg-[var(--panel)] px-1">npm run import:jobs</code>.
-          </p>
+          <div className="space-y-3 py-12 text-center text-[var(--muted)]">
+            {activeQ || sp.eligibility || sp.seniority ? (
+              <>
+                <p>
+                  No openings match
+                  {activeQ ? (
+                    <>
+                      {" "}
+                      “<strong className="text-[var(--ink)]">{activeQ}</strong>”
+                    </>
+                  ) : (
+                    " these filters"
+                  )}
+                  .
+                </p>
+                <p>
+                  <Link href="/jobs" className="text-[var(--accent)] underline">
+                    Clear search and show all jobs
+                  </Link>
+                </p>
+              </>
+            ) : (
+              <p>
+                No jobs in the database yet. An admin needs to run Import from the Admin page.
+              </p>
+            )}
+          </div>
         ) : (
           jobs.map((job) => <JobCard key={job.id} job={job} />)
         )}

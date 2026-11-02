@@ -95,3 +95,25 @@ model SavedSearch {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
+
+/** Always-on CRM log (works even when Google Sheet webhook is not configured). */
+model LeadEvent {
+  id                   String   @id @default(cuid())
+  event                String
+  userId               String?
+  name                 String?
+  email                String?
+  phone                String?
+  city                 String?
+  state                String?
+  qualification        String?
+  specialty            String?
+  plan                 String?
+  subscriptionStatus   String?
+  notes                String?
+  sheetSynced          Boolean  @default(false)
+  createdAt            DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([email])
+}
