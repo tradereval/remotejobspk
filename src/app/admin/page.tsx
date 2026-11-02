@@ -47,7 +47,7 @@ export default async function AdminPage({
       </div>
 
       <section className="rounded-2xl border border-[var(--line)] bg-white/80 p-5">
-        <h2 className="font-[family-name:var(--font-display)] text-xl">Refresh from Himalayas</h2>
+        <h2 className="font-[family-name:var(--font-display)] text-xl">Refresh job feed</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">
           Imports Pakistan + worldwide feeds, dedupes, expires dead listings.
         </p>

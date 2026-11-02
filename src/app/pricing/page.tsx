@@ -5,8 +5,8 @@ export default function PricingPage() {
     <div className="mx-auto max-w-5xl px-4 py-12">
       <h1 className="font-[family-name:var(--font-display)] text-4xl">Pricing</h1>
       <p className="mt-3 max-w-2xl text-[var(--muted)]">
-        Global boards (FlexJobs, Remotive Accelerator) charge ~$20–25/mo to save you from scams and junk.
-        We keep apply links free, and charge a Pakistan-friendly price for screening + smarter matching.
+        Most global remote boards charge ~$20–25/mo just to cut scams and junk. We keep apply links free,
+        and charge a Pakistan-friendly price for screening + smarter matching.
       </p>
 
       <div className="mt-8 rounded-2xl border border-[var(--line)] bg-white/70 p-5">
@@ -17,7 +17,7 @@ export default function PricingPage() {
           <li>• Better fit: profile (specialty, city, qualification) drives matching</li>
           <li>• Alerts when the right roles appear (Premium — wiring next)</li>
           <li>• Apply links stay free — we never paywall the application URL</li>
-          <li>• ~8× cheaper than FlexJobs monthly, built for PK seekers</li>
+          <li>• Fraction of typical global board pricing, built for PK seekers</li>
         </ul>
       </div>
 

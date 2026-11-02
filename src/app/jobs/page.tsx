@@ -2,13 +2,18 @@ import Link from "next/link";
 import { JobCard } from "@/components/job-card";
 import { getCurrentUser, isPremium } from "@/lib/auth";
 import { listJobs } from "@/lib/jobs";
-import type { Eligibility } from "@/lib/types";
+import {
+  EMPLOYMENT_TYPES,
+  JOB_CATEGORY_CHIPS,
+  type Eligibility,
+} from "@/lib/types";
 
 type SearchParams = Promise<{
   q?: string;
   eligibility?: string;
   category?: string;
   seniority?: string;
+  employmentType?: string;
   verified?: string;
   beginners?: string;
   page?: string;
@@ -18,20 +23,35 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
   const sp = await searchParams;
   const user = await getCurrentUser();
   const premium = await isPremium(user);
-  // Only filter when the user explicitly searched — never hide the full board automatically.
   const activeQ = sp.q?.trim() || undefined;
+  const activeCategory = sp.category?.trim() || undefined;
+  const activeType = sp.employmentType?.trim() || undefined;
 
   const filters = {
     q: activeQ,
     eligibility: (sp.eligibility as Eligibility | "pk_ready" | undefined) || "pk_ready",
-    category: sp.category,
+    category: activeCategory,
     seniority: sp.seniority,
+    employmentType: activeType,
     verifiedOnly: premium && sp.verified === "1",
     beginners: premium && sp.beginners === "1",
     page: Number(sp.page || "1"),
   };
 
   const { jobs, total, page, totalPages } = await listJobs(filters, { premium });
+
+  function chipHref(category?: string) {
+    const params = new URLSearchParams();
+    if (activeQ) params.set("q", activeQ);
+    if (filters.eligibility) params.set("eligibility", String(filters.eligibility));
+    if (sp.seniority) params.set("seniority", sp.seniority);
+    if (activeType) params.set("employmentType", activeType);
+    if (category) params.set("category", category);
+    if (premium && sp.verified === "1") params.set("verified", "1");
+    if (premium && sp.beginners === "1") params.set("beginners", "1");
+    const qs = params.toString();
+    return qs ? `/jobs?${qs}` : "/jobs";
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -71,6 +91,32 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
         </div>
       )}
 
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Link
+          href={chipHref(undefined)}
+          className={`rounded-full border px-3 py-1.5 text-sm ${
+            !activeCategory
+              ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--bg)]"
+              : "border-[var(--line)] bg-white/80 text-[var(--muted)] hover:border-[var(--ink)]"
+          }`}
+        >
+          All categories
+        </Link>
+        {JOB_CATEGORY_CHIPS.map((cat) => (
+          <Link
+            key={cat}
+            href={chipHref(cat)}
+            className={`rounded-full border px-3 py-1.5 text-sm ${
+              activeCategory === cat
+                ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--bg)]"
+                : "border-[var(--line)] bg-white/80 text-[var(--muted)] hover:border-[var(--ink)]"
+            }`}
+          >
+            {cat}
+          </Link>
+        ))}
+      </div>
+
       <form className="mb-8 grid gap-3 rounded-2xl border border-[var(--line)] bg-white/70 p-4 sm:grid-cols-4">
         <input
           name="q"
@@ -99,8 +145,21 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
           <option value="senior">Senior</option>
           <option value="lead">Lead</option>
         </select>
+        <select
+          name="employmentType"
+          defaultValue={activeType || ""}
+          className="rounded-xl border border-[var(--line)] bg-white px-3 py-2 sm:col-span-2"
+        >
+          <option value="">Any job type</option>
+          {EMPLOYMENT_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+        <input type="hidden" name="category" value={activeCategory || ""} />
         <label
-          className={`flex items-center gap-2 text-sm sm:col-span-2 ${premium ? "" : "opacity-60"}`}
+          className={`flex items-center gap-2 text-sm sm:col-span-1 ${premium ? "" : "opacity-60"}`}
         >
           <input
             type="checkbox"
@@ -117,7 +176,7 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
           )}
         </label>
         <label
-          className={`flex items-center gap-2 text-sm sm:col-span-2 ${premium ? "" : "opacity-60"}`}
+          className={`flex items-center gap-2 text-sm sm:col-span-1 ${premium ? "" : "opacity-60"}`}
         >
           <input
             type="checkbox"
@@ -144,7 +203,7 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
       <div className="rounded-2xl border border-[var(--line)] bg-white/80 px-4">
         {jobs.length === 0 ? (
           <div className="space-y-3 py-12 text-center text-[var(--muted)]">
-            {activeQ || sp.eligibility || sp.seniority ? (
+            {activeQ || sp.eligibility || sp.seniority || activeCategory || activeType ? (
               <>
                 <p>
                   No openings match

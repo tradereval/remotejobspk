@@ -8,11 +8,13 @@ export async function listJobs(filters: JobFilters, opts?: { premium?: boolean }
   const page = Math.max(1, filters.page || 1);
   const where: Prisma.JobWhereInput = {
     isActive: true,
-    // Hide placeholder docs-domain apply links from the public board
+    // Hide placeholder / seed demos from the public board
     NOT: {
       OR: [
         { applicationUrl: { contains: "example.com" } },
         { applicationUrl: { contains: "example.org" } },
+        { applicationUrl: { contains: "example.net" } },
+        { externalId: { startsWith: "seed-" } },
       ],
     },
   };
@@ -41,6 +43,10 @@ export async function listJobs(filters: JobFilters, opts?: { premium?: boolean }
 
   if (filters.seniority) {
     where.seniority = { contains: filters.seniority };
+  }
+
+  if (filters.employmentType) {
+    where.employmentType = { contains: filters.employmentType };
   }
 
   if (opts?.premium) {
@@ -73,6 +79,8 @@ const publicJobWhere: Prisma.JobWhereInput = {
     OR: [
       { applicationUrl: { contains: "example.com" } },
       { applicationUrl: { contains: "example.org" } },
+      { applicationUrl: { contains: "example.net" } },
+      { externalId: { startsWith: "seed-" } },
     ],
   },
 };

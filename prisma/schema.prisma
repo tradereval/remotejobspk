@@ -54,7 +54,10 @@ model Job {
   salaryMax         Int?
   salaryCurrency    String?
   salaryPeriod      String?
+  employmentType    String? // Full-Time | Part-Time | Contractor | Freelance
   seniority         String?
+  locationRestrictions String @default("[]") // JSON string[]
+  timezoneRestrictions String @default("[]") // JSON number[] (UTC offsets)
   categories        String     @default("[]") // JSON array
   skills            String     @default("[]") // JSON array
   eligibility       String     @default("unknown") // pakistan | worldwide | restricted | unknown

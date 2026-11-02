@@ -27,8 +27,8 @@ export default async function HomePage() {
             Stop wasting weeks on jobs that never hire from Pakistan
           </h1>
           <p className="mt-5 max-w-2xl text-lg text-white/80">
-            Like FlexJobs, we screen. Unlike them, apply links stay free — and Premium is Rs 999 / $3, not
-            $25. Tell us your specialty; we match roles that actually fit.
+            We screen every listing for Pakistan eligibility. Apply links stay free — Premium is Rs 999 /
+            $3 for faster filters and matching. Tell us your specialty; we match roles that actually fit.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
@@ -62,7 +62,7 @@ export default async function HomePage() {
           />
           <Feature
             title="2. Premium for speed"
-            body="Pay for verified-only filters, beginner-friendly roles, and (soon) daily alerts — the same ‘save my time’ model as FlexJobs, priced for PK."
+            body="Pay for verified-only filters, beginner-friendly roles, and (soon) daily alerts — screening that saves you time, priced for Pakistan."
           />
           <Feature
             title="3. We keep a CRM"

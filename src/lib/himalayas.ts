@@ -1,6 +1,6 @@
 import { prisma } from "./db";
 import { scoreEligibility } from "./eligibility";
-import type { Eligibility } from "./types";
+import { cleanJobDescriptionHtml, type Eligibility } from "./types";
 
 type HimalayasJob = {
   title?: string;
@@ -74,6 +74,21 @@ function asSeniority(value: string | string[] | null | undefined): string | null
   return String(value);
 }
 
+function asStringList(value: string[] | string | null | undefined): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  return String(value)
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function asNumberList(value: Array<string | number> | string | null | undefined): number[] {
+  if (!value) return [];
+  const arr = Array.isArray(value) ? value : String(value).split(",");
+  return arr.map(Number).filter((n) => !Number.isNaN(n));
+}
+
 export async function importHimalayasJobs(options?: { maxPages?: number }) {
   const maxPages = options?.maxPages ?? 15;
   let upserted = 0;
@@ -124,11 +139,10 @@ export async function importHimalayasJobs(options?: { maxPages?: number }) {
           eligibility = scored.eligibility;
         }
 
-        const categories = [
-          ...(job.categories || []),
-          ...(job.parentCategories || []),
-          job.employmentType || "",
-        ].filter(Boolean);
+        const categories = [...(job.parentCategories || []), ...(job.categories || [])].filter(Boolean);
+        const locations = asStringList(job.locationRestrictions);
+        const timezones = asNumberList(job.timezoneRestrictions);
+        const description = cleanJobDescriptionHtml(job.description);
 
         const expiresAt = parseDate(job.expiryDate);
         const publishedAt = parseDate(job.pubDate) || new Date();
@@ -146,15 +160,18 @@ export async function importHimalayasJobs(options?: { maxPages?: number }) {
               title: job.title,
               company: job.companyName,
               companyLogo: job.companyLogo || null,
-              description: job.description || null,
+              description,
               excerpt: job.excerpt || null,
               applicationUrl: job.applicationLink,
-              sourceAttributionUrl: "https://himalayas.app",
+              sourceAttributionUrl: null,
               salaryMin: job.minSalary ?? null,
               salaryMax: job.maxSalary ?? null,
               salaryCurrency: job.currency || null,
               salaryPeriod: job.salaryPeriod || null,
+              employmentType: job.employmentType || null,
               seniority: asSeniority(job.seniority),
+              locationRestrictions: JSON.stringify(locations),
+              timezoneRestrictions: JSON.stringify(timezones),
               categories: JSON.stringify(categories),
               skills: JSON.stringify([]),
               eligibility,
@@ -169,14 +186,18 @@ export async function importHimalayasJobs(options?: { maxPages?: number }) {
               title: job.title,
               company: job.companyName,
               companyLogo: job.companyLogo || null,
-              description: job.description || null,
+              description,
               excerpt: job.excerpt || null,
               applicationUrl: job.applicationLink,
+              sourceAttributionUrl: null,
               salaryMin: job.minSalary ?? null,
               salaryMax: job.maxSalary ?? null,
               salaryCurrency: job.currency || null,
               salaryPeriod: job.salaryPeriod || null,
+              employmentType: job.employmentType || null,
               seniority: asSeniority(job.seniority),
+              locationRestrictions: JSON.stringify(locations),
+              timezoneRestrictions: JSON.stringify(timezones),
               categories: JSON.stringify(categories),
               eligibility,
               expiresAt,
