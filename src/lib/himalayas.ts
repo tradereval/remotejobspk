@@ -247,7 +247,6 @@ async function saveBatch(rows: Row[], counters: Counters) {
           update: data.update,
         }),
       ),
-      { maxWait: 30_000, timeout: 120_000 },
     );
     counters.upserted += prepared.length;
     counters.expired += prepared.filter((data) => data.isExpired).length;
