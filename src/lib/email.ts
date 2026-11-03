@@ -2,7 +2,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { issueEmailVerification } from "./auth";
 import { logOutboundEmail, type LeadUser } from "./leads-sheet";
-import { siteUrl } from "./site";
+import { emailSiteUrl } from "./site";
 
 type SendResult = { sent: boolean; skipped: boolean };
 
@@ -93,14 +93,8 @@ export async function sendEmail(input: {
   return { sent: false, skipped: !key && !(url && secret) };
 }
 
-function isPublicSite(url: string) {
-  return !/localhost|127\.0\.0\.1/i.test(url);
-}
-
 function footerLink(path: string, label: string) {
-  const home = siteUrl();
-  if (!isPublicSite(home)) return escapeHtml(label);
-  return `<a href="${home}${path}" style="color:#0f7a5a">${escapeHtml(label)}</a>`;
+  return `<a href="${emailSiteUrl()}${path}" style="color:#0f7a5a">${escapeHtml(label)}</a>`;
 }
 
 function letter(title: string, body: string) {
@@ -147,7 +141,7 @@ function verifyButton(link: string, label: string) {
 
 export async function sendAccountVerification(user: LeadUser, nextPath: string, asked?: string) {
   const token = await issueEmailVerification(user.id);
-  const link = `${siteUrl()}/verify-email/confirm?token=${encodeURIComponent(token)}&next=${encodeURIComponent(nextPath)}`;
+  const link = `${emailSiteUrl()}/verify-email/confirm?token=${encodeURIComponent(token)}&next=${encodeURIComponent(nextPath)}`;
   const askedLine = asked
     ? `You asked for: ${asked}`
     : "After you verify, we open the remote jobs that match what you asked for.";
@@ -170,7 +164,7 @@ export async function sendAccountVerification(user: LeadUser, nextPath: string, 
 }
 
 export async function sendWelcome(user: LeadUser) {
-  const jobs = `${siteUrl()}/jobs`;
+  const jobs = `${emailSiteUrl()}/jobs`;
   const result = await sendEmail({
     to: user.email,
     subject: "Welcome to RemoteJobsPK",
@@ -188,7 +182,7 @@ export async function sendWelcome(user: LeadUser) {
 }
 
 export async function sendPasswordReset(user: LeadUser, token: string) {
-  const link = `${siteUrl()}/reset?token=${encodeURIComponent(token)}`;
+  const link = `${emailSiteUrl()}/reset?token=${encodeURIComponent(token)}`;
   const result = await sendEmail({
     to: user.email,
     subject: "Reset your RemoteJobsPK password",
@@ -207,11 +201,11 @@ export async function sendReceipt(user: LeadUser, planLabel: string) {
   const result = await sendEmail({
     to: user.email,
     subject: "Premium is on — RemoteJobsPK",
-    text: `${planLabel} is active for 30 days. Verified filter, beginners filter, saved searches, and daily email are included. ${siteUrl()}/account`,
+    text: `${planLabel} is active for 30 days. Verified filter, beginners filter, saved searches, and daily email are included. ${emailSiteUrl()}/account`,
     html: letter(
       "Premium is on",
       `<p>${escapeHtml(planLabel)} is active for 30 days. You can use the verified filter, the beginners filter, saved searches, and daily email when new matches land.</p>
-       <p><a href="${siteUrl()}/account">Open your account</a></p>`,
+       <p><a href="${emailSiteUrl()}/account">Open your account</a></p>`,
     ),
   });
   if (result.sent) await logOutboundEmail(user, `Receipt: ${planLabel}`);
@@ -224,12 +218,12 @@ export async function sendJobAlert(
   jobs: { id: string; title: string; company: string }[],
 ) {
   const lines = jobs
-    .map((job) => `• ${job.title} — ${job.company} — ${siteUrl()}/jobs/${job.id}`)
+    .map((job) => `• ${job.title} — ${job.company} — ${emailSiteUrl()}/jobs/${job.id}`)
     .join("\n");
   const items = jobs
     .map(
       (job) =>
-        `<li><a href="${siteUrl()}/jobs/${job.id}">${escapeHtml(job.title)}</a> — ${escapeHtml(job.company)}</li>`,
+        `<li><a href="${emailSiteUrl()}/jobs/${job.id}">${escapeHtml(job.title)}</a> — ${escapeHtml(job.company)}</li>`,
     )
     .join("");
   const result = await sendEmail({
