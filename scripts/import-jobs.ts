@@ -1,27 +1,16 @@
-import fs from "fs";
 import { prisma } from "../src/lib/db";
-
-const importLog = process.env.IMPORT_LOG;
-if (importLog) {
-  const mirror = (write: (...args: unknown[]) => void) => (...args: unknown[]) => {
-    write(...args);
-    fs.appendFileSync(importLog, `${args.map(String).join(" ")}\n`);
-  };
-  console.log = mirror(console.log.bind(console));
-  console.error = mirror(console.error.bind(console));
-}
 import { importHimalayasJobs } from "../src/lib/himalayas";
 import { buildJobWhere } from "../src/lib/jobs";
 
 async function main() {
-  console.log("Importing Himalayas jobs (Pakistan, worldwide, then the full browse catalog)...");
+  console.log("Importing Himalayas jobs (PK + worldwide, until each search feed ends)...");
   const result = await importHimalayasJobs();
   const [board, active, grouped] = await Promise.all([
     prisma.job.count({ where: buildJobWhere({}) }),
     prisma.job.count({ where: { isActive: true } }),
     prisma.job.groupBy({
       by: ["eligibility"],
-      where: { source: "himalayas" },
+      where: { source: "himalayas", isActive: true },
       _count: true,
     }),
   ]);
