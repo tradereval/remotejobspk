@@ -73,7 +73,7 @@ async function fetchJson(url: string): Promise<HimalayasResponse> {
   for (let attempt = 0; attempt < 8; attempt++) {
     try {
       await pace();
-      const res = await fetch(url, { headers, cache: "no-store" });
+      const res = await fetch(url, { headers, cache: "no-store", signal: AbortSignal.timeout(25_000) });
       if (res.status === 429 || res.status === 502 || res.status === 503) {
         slowDown();
         const retryAfter = Number(res.headers.get("retry-after"));
