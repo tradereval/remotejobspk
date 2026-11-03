@@ -5,6 +5,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-cert
   && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
+# postinstall runs `prisma generate`, which requires the variable but not a live database
+ENV DATABASE_URL="file:/data/prod.db"
 RUN npm ci
 
 FROM node:22-bookworm-slim AS builder
@@ -13,6 +15,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+ENV DATABASE_URL="file:/data/prod.db"
 RUN npx prisma generate
 # Full build required — compile-only mode ships fonts/CSS stubs without Tailwind utilities
 RUN npx next build --webpack
