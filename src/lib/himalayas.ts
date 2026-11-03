@@ -29,7 +29,16 @@ type HimalayasResponse = {
   totalCount?: number;
 };
 
+type Feed = { country?: string; worldwide?: string };
+
+type Counters = { upserted: number; failed: number; expired: number };
+
 const BASE = "https://himalayas.app/jobs/api";
+const PAGE_SIZE = 20;
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function fetchJson(url: string): Promise<HimalayasResponse> {
   const headers: HeadersInit = {
@@ -39,11 +48,41 @@ async function fetchJson(url: string): Promise<HimalayasResponse> {
   if (process.env.HIMALAYAS_API_KEY) {
     headers.Authorization = `Bearer ${process.env.HIMALAYAS_API_KEY}`;
   }
-  const res = await fetch(url, { headers, cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Himalayas API ${res.status}: ${await res.text()}`);
+
+  let lastError = "Himalayas API failed";
+  for (let attempt = 0; attempt < 8; attempt++) {
+    try {
+      const res = await fetch(url, { headers, cache: "no-store" });
+      if (res.status === 429 || res.status === 502 || res.status === 503) {
+        const retryAfter = Number(res.headers.get("retry-after"));
+        const waitMs =
+          Number.isFinite(retryAfter) && retryAfter > 0
+            ? Math.min(retryAfter, 120) * 1000
+            : Math.min(30_000, 1000 * 2 ** attempt);
+        console.log(`Himalayas ${res.status}, waiting ${waitMs}ms`);
+        await sleep(waitMs);
+        lastError = `Himalayas API ${res.status}`;
+        continue;
+      }
+      const text = await res.text();
+      if (!res.ok) {
+        throw new Error(`Himalayas API ${res.status}: ${text.slice(0, 180)}`);
+      }
+      if (text.trimStart().startsWith("<")) {
+        const waitMs = Math.min(30_000, 1000 * 2 ** attempt);
+        console.log(`Himalayas returned HTML, waiting ${waitMs}ms`);
+        await sleep(waitMs);
+        lastError = "Himalayas API returned HTML";
+        continue;
+      }
+      return JSON.parse(text) as HimalayasResponse;
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("Himalayas API ")) throw error;
+      lastError = error instanceof Error ? error.message : "Himalayas API failed";
+      await sleep(Math.min(30_000, 1000 * 2 ** attempt));
+    }
   }
-  return res.json();
+  throw new Error(lastError);
 }
 
 function buildSearchUrl(params: Record<string, string>) {
@@ -54,7 +93,6 @@ function buildSearchUrl(params: Record<string, string>) {
 function parseDate(value: string | number | null | undefined): Date | null {
   if (value === null || value === undefined || value === "") return null;
   if (typeof value === "number") {
-    // Himalayas often returns unix seconds
     const ms = value < 1e12 ? value * 1000 : value;
     const d = new Date(ms);
     return Number.isNaN(d.getTime()) ? null : d;
@@ -90,138 +128,200 @@ function asNumberList(value: Array<string | number> | string | null | undefined)
   return arr.map(Number).filter((n) => !Number.isNaN(n));
 }
 
-export async function importHimalayasJobs(options?: { maxPages?: number }) {
-  const maxPages = options?.maxPages ?? 120;
-  let upserted = 0;
-  let failed = 0;
-  let expired = 0;
-  const seenGuids = new Set<string>();
+function asInt(value: number | null | undefined): number | null {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return null;
+  return Math.round(Number(value));
+}
 
-  const feeds: Array<{ country?: string; worldwide?: string }> = [
-    { country: "PK" },
-    { worldwide: "true" },
-  ];
+async function tuneSqlite() {
+  const url = process.env.DATABASE_URL || "";
+  if (!url.startsWith("file:")) return;
+  try {
+    await prisma.$queryRawUnsafe("PRAGMA journal_mode=WAL");
+    await prisma.$queryRawUnsafe("PRAGMA synchronous=NORMAL");
+    await prisma.$queryRawUnsafe("PRAGMA busy_timeout=30000");
+    await prisma.$queryRawUnsafe("PRAGMA cache_size=-65536");
+  } catch (error) {
+    console.error("SQLite tune skipped", error instanceof Error ? error.message : error);
+  }
+}
 
-  for (const feed of feeds) {
-    for (let page = 1; page <= maxPages; page++) {
-      const params: Record<string, string> = {
-        page: String(page),
-        limit: "20",
-        sort: "recent",
-      };
-      if (feed.country) params.country = feed.country;
-      if (feed.worldwide) params.worldwide = feed.worldwide;
+type Row = { job: HimalayasJob; eligibility: Eligibility; needsReview: boolean };
 
-      const data = await fetchJson(buildSearchUrl(params));
-      const jobs = data.jobs || [];
-      if (!jobs.length) break;
-      console.log(
-        `Himalayas ${feed.country || "worldwide"} page ${page}: ${jobs.length} (catalog ${data.totalCount ?? "?"})`,
-      );
+function buildUpsert(row: Row) {
+  const job = row.job;
+  const externalId = job.guid || job.applicationLink || "";
+  const categories = [...(job.parentCategories || []), ...(job.categories || [])].filter(Boolean);
+  const locations = asStringList(job.locationRestrictions);
+  const timezones = asNumberList(job.timezoneRestrictions as Array<string | number> | string | null | undefined);
+  const description = cleanJobDescriptionHtml(job.description);
+  const expiresAt = parseDate(job.expiryDate);
+  const publishedAt = parseDate(job.pubDate) || new Date();
+  const isExpired = expiresAt ? expiresAt < new Date() : false;
+  const shared = {
+    title: job.title || "",
+    company: job.companyName || "",
+    companyLogo: job.companyLogo || null,
+    description,
+    excerpt: job.excerpt || null,
+    applicationUrl: job.applicationLink || "",
+    sourceAttributionUrl: null,
+    salaryMin: asInt(job.minSalary),
+    salaryMax: asInt(job.maxSalary),
+    salaryCurrency: job.currency || null,
+    salaryPeriod: job.salaryPeriod || null,
+    employmentType: job.employmentType || null,
+    seniority: asSeniority(job.seniority),
+    locationRestrictions: JSON.stringify(locations),
+    timezoneRestrictions: JSON.stringify(timezones),
+    categories: JSON.stringify(categories),
+    eligibility: row.eligibility,
+    expiresAt,
+    publishedAt,
+    isActive: !isExpired,
+    needsReview: row.needsReview,
+  };
+  return {
+    externalId,
+    isExpired,
+    create: {
+      source: "himalayas",
+      externalId,
+      ...shared,
+      skills: JSON.stringify([]),
+      acceptsBeginners: false,
+      isVerified: false,
+    },
+    update: shared,
+  };
+}
 
-      for (const job of jobs) {
-        const externalId = job.guid || job.applicationLink;
-        if (!externalId || !job.title || !job.companyName || !job.applicationLink) continue;
-        if (seenGuids.has(externalId)) continue;
-        seenGuids.add(externalId);
+async function saveBatch(rows: Row[], counters: Counters) {
+  if (!rows.length) return;
+  const prepared = rows.map(buildUpsert);
+  const runOne = async (data: ReturnType<typeof buildUpsert>) => {
+    await prisma.job.upsert({
+      where: { source_externalId: { source: "himalayas", externalId: data.externalId } },
+      create: data.create,
+      update: data.update,
+    });
+    counters.upserted += 1;
+    if (data.isExpired) counters.expired += 1;
+  };
 
-        const scored = scoreEligibility({
-          locationRestrictions: job.locationRestrictions,
-          timezoneRestrictions: job.timezoneRestrictions,
-          countries: feed.country ? ["Pakistan"] : undefined,
-          description: `${job.excerpt || ""} ${job.description || ""}`,
-          title: job.title,
-          forceCountry: feed.country === "PK" ? "PK" : null,
-        });
-
-        let eligibility: Eligibility;
-        if (feed.country === "PK") {
-          eligibility = scored.eligibility === "restricted" ? "restricted" : "pakistan";
-        } else if (scored.eligibility === "unknown") {
-          eligibility = "worldwide";
-        } else {
-          eligibility = scored.eligibility;
-        }
-
-        const categories = [...(job.parentCategories || []), ...(job.categories || [])].filter(Boolean);
-        const locations = asStringList(job.locationRestrictions);
-        const timezones = asNumberList(job.timezoneRestrictions);
-        const description = cleanJobDescriptionHtml(job.description);
-
-        const expiresAt = parseDate(job.expiryDate);
-        const publishedAt = parseDate(job.pubDate) || new Date();
-        const isExpired = expiresAt ? expiresAt < new Date() : false;
-        const needsReview = eligibility === "restricted" || scored.needsReview;
-
-        try {
-          await prisma.job.upsert({
-            where: {
-              source_externalId: { source: "himalayas", externalId },
-            },
-            create: {
-              source: "himalayas",
-              externalId,
-              title: job.title,
-              company: job.companyName,
-              companyLogo: job.companyLogo || null,
-              description,
-              excerpt: job.excerpt || null,
-              applicationUrl: job.applicationLink,
-              sourceAttributionUrl: null,
-              salaryMin: job.minSalary ?? null,
-              salaryMax: job.maxSalary ?? null,
-              salaryCurrency: job.currency || null,
-              salaryPeriod: job.salaryPeriod || null,
-              employmentType: job.employmentType || null,
-              seniority: asSeniority(job.seniority),
-              locationRestrictions: JSON.stringify(locations),
-              timezoneRestrictions: JSON.stringify(timezones),
-              categories: JSON.stringify(categories),
-              skills: JSON.stringify([]),
-              eligibility,
-              acceptsBeginners: false,
-              isVerified: false,
-              needsReview,
-              publishedAt,
-              expiresAt,
-              isActive: !isExpired,
-            },
-            update: {
-              title: job.title,
-              company: job.companyName,
-              companyLogo: job.companyLogo || null,
-              description,
-              excerpt: job.excerpt || null,
-              applicationUrl: job.applicationLink,
-              sourceAttributionUrl: null,
-              salaryMin: job.minSalary ?? null,
-              salaryMax: job.maxSalary ?? null,
-              salaryCurrency: job.currency || null,
-              salaryPeriod: job.salaryPeriod || null,
-              employmentType: job.employmentType || null,
-              seniority: asSeniority(job.seniority),
-              locationRestrictions: JSON.stringify(locations),
-              timezoneRestrictions: JSON.stringify(timezones),
-              categories: JSON.stringify(categories),
-              eligibility,
-              expiresAt,
-              publishedAt,
-              isActive: !isExpired,
-              needsReview,
-            },
-          });
-          upserted += 1;
-          if (isExpired) expired += 1;
-        } catch (err) {
-          failed += 1;
-          console.error("Failed job upsert", externalId, err);
-        }
+  try {
+    await prisma.$transaction(
+      prepared.map((data) =>
+        prisma.job.upsert({
+          where: { source_externalId: { source: "himalayas", externalId: data.externalId } },
+          create: data.create,
+          update: data.update,
+        }),
+      ),
+      { maxWait: 30_000, timeout: 120_000 },
+    );
+    counters.upserted += prepared.length;
+    counters.expired += prepared.filter((data) => data.isExpired).length;
+  } catch (error) {
+    console.error("Page transaction failed, retrying one by one", error instanceof Error ? error.message : error);
+    for (const data of prepared) {
+      try {
+        await runOne(data);
+      } catch (one) {
+        counters.failed += 1;
+        console.error("Failed job upsert", data.externalId, one instanceof Error ? one.message : one);
       }
-
-      if (jobs.length < 20) break;
-      if (data.totalCount && page * 20 >= data.totalCount) break;
     }
   }
+}
+
+function takeNewJobs(jobs: HimalayasJob[], seenGuids: Set<string>) {
+  const fresh: HimalayasJob[] = [];
+  for (const job of jobs) {
+    const externalId = job.guid || job.applicationLink;
+    if (!externalId || !job.title || !job.companyName || !job.applicationLink) continue;
+    if (seenGuids.has(externalId)) continue;
+    seenGuids.add(externalId);
+    fresh.push(job);
+  }
+  return fresh;
+}
+
+async function importSearchFeed(
+  feed: Feed,
+  seenGuids: Set<string>,
+  counters: Counters,
+  maxPages: number | undefined,
+) {
+  let pages = 0;
+  let fetched = 0;
+  const feedSeen = new Set<string>();
+  for (let page = 1; maxPages === undefined || page <= maxPages; page++) {
+    const params: Record<string, string> = {
+      page: String(page),
+      limit: String(PAGE_SIZE),
+      sort: "recent",
+    };
+    if (feed.country) params.country = feed.country;
+    if (feed.worldwide) params.worldwide = feed.worldwide;
+
+    const data = await fetchJson(buildSearchUrl(params));
+    const jobs = data.jobs || [];
+    if (!jobs.length) break;
+
+    const pageIds = jobs
+      .map((job) => job.guid || job.applicationLink)
+      .filter((id): id is string => Boolean(id));
+    const novel = pageIds.filter((id) => !feedSeen.has(id));
+    for (const id of pageIds) feedSeen.add(id);
+    if (pageIds.length > 0 && novel.length === 0) {
+      console.log(`Himalayas ${feed.country || "worldwide"} page ${page} repeated an earlier page, stopping`);
+      break;
+    }
+
+    pages += 1;
+    console.log(
+      `Himalayas ${feed.country || "worldwide"} page ${page}: ${jobs.length} (catalog ${data.totalCount ?? "?"})`,
+    );
+
+    const batch: Row[] = takeNewJobs(jobs, seenGuids).map((job) => {
+      const scored = scoreEligibility({
+        locationRestrictions: job.locationRestrictions,
+        timezoneRestrictions: job.timezoneRestrictions,
+        countries: feed.country ? ["Pakistan"] : undefined,
+        description: `${job.excerpt || ""} ${job.description || ""}`,
+        title: job.title,
+        forceCountry: feed.country === "PK" ? "PK" : null,
+      });
+      let eligibility: Eligibility;
+      if (feed.country === "PK") {
+        eligibility = scored.eligibility === "restricted" ? "restricted" : "pakistan";
+      } else if (scored.eligibility === "unknown") {
+        eligibility = "worldwide";
+      } else {
+        eligibility = scored.eligibility;
+      }
+      return {
+        job,
+        eligibility,
+        needsReview: eligibility === "restricted" || scored.needsReview,
+      };
+    });
+    await saveBatch(batch, counters);
+    fetched += jobs.length;
+    if (jobs.length < PAGE_SIZE) break;
+    if (typeof data.totalCount === "number" && fetched >= data.totalCount) break;
+  }
+  return pages;
+}
+
+export async function importHimalayasJobs(options?: { maxPages?: number }) {
+  await tuneSqlite();
+  const counters: Counters = { upserted: 0, failed: 0, expired: 0 };
+  const seenGuids = new Set<string>();
+
+  const pakistanPages = await importSearchFeed({ country: "PK" }, seenGuids, counters, options?.maxPages);
+  const worldwidePages = await importSearchFeed({ worldwide: "true" }, seenGuids, counters, options?.maxPages);
 
   const deactivate = await prisma.job.updateMany({
     where: {
@@ -233,9 +333,10 @@ export async function importHimalayasJobs(options?: { maxPages?: number }) {
   });
 
   return {
-    upserted,
-    failed,
-    expiredMarked: expired + deactivate.count,
+    upserted: counters.upserted,
+    failed: counters.failed,
+    expiredMarked: counters.expired + deactivate.count,
     uniqueSeen: seenGuids.size,
+    pagesWalked: pakistanPages + worldwidePages,
   };
 }
