@@ -6,6 +6,24 @@ import { emailSiteUrl } from "./site";
 
 type SendResult = { sent: boolean; skipped: boolean };
 
+function redactMailError(body: string) {
+  return body
+    .replace(/https?:\/\/\S+/gi, "[url]")
+    .replace(/[A-Za-z0-9+/_=-]{24,}/g, "[redacted]")
+    .replace(/[\w.+-]+@[\w.-]+/g, "[email]")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 160);
+}
+
+function parseMailResponse(raw: string): { ok?: boolean } | null {
+  try {
+    return JSON.parse(raw) as { ok?: boolean };
+  } catch {
+    return null;
+  }
+}
+
 function fromAddress() {
   return process.env.RESEND_FROM || "RemoteJobsPK <hello@remotejobspk.com>";
 }
@@ -79,9 +97,10 @@ export async function sendEmail(input: {
           logoBase64: logo,
         }),
       });
-      const data = (await res.json().catch(() => null)) as { ok?: boolean } | null;
+      const raw = await res.text().catch(() => "");
+      const data = parseMailResponse(raw);
       if (res.ok && data?.ok) return { sent: true, skipped: false };
-      console.error("[email] workspace mail failed", res.status);
+      console.error("[email] workspace mail failed", res.status, redactMailError(raw));
     } catch (err) {
       console.error("[email] workspace mail error", err);
     }
