@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { importHimalayasJobs } from "@/lib/himalayas";
-import { buildJobWhere } from "@/lib/jobs";
+import { importPublicJobSources, jobCountSummary } from "@/lib/sources/import-public";
+import { SKIPPED_JOB_SOURCES } from "@/lib/sources/skipped";
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -10,16 +10,31 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const sources = [];
   try {
-    const result = await importHimalayasJobs();
-    const [board, active] = await Promise.all([
-      prisma.job.count({ where: buildJobWhere({}) }),
-      prisma.job.count({ where: { isActive: true } }),
-    ]);
-    return NextResponse.json({ ok: true, ...result, active, board });
+    const himalayas = await importHimalayasJobs();
+    sources.push({ source: "himalayas", ...himalayas });
+  } catch (error) {
+    sources.push({
+      source: "himalayas",
+      error: error instanceof Error ? error.message : "Import failed",
+    });
+  }
+
+  try {
+    const extra = await importPublicJobSources();
+    sources.push(...extra.sources);
+    const counts = await jobCountSummary();
+    const himalayasFailed = sources.some((item) => item.source === "himalayas" && "error" in item);
+    return NextResponse.json({
+      ok: !himalayasFailed,
+      sources,
+      skipped: SKIPPED_JOB_SOURCES,
+      ...counts,
+    });
   } catch (error) {
     return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "Import failed" },
+      { ok: false, sources, error: error instanceof Error ? error.message : "Import failed" },
       { status: 500 },
     );
   }

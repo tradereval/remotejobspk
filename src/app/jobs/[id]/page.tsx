@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { CompanyProfile } from "@/components/company-profile";
 import { EligibilityBadge } from "@/components/eligibility-badge";
 import { JobActions } from "@/components/job-actions";
+import { applyCta } from "@/lib/apply-label";
 import { companyIntro, directApplyUrl, himalayasCompanyUrl, isOffBoard } from "@/lib/board-rules";
 import { prisma } from "@/lib/db";
 import { buildJobWhere } from "@/lib/jobs";
@@ -42,7 +43,8 @@ export default async function JobDetailPage({
   });
   const intro = companyIntro(job.description, job.company);
   const companyUrl = himalayasCompanyUrl(job.applicationUrl);
-  const employerApply = directApplyUrl(job.description);
+  const employerApply = job.source === "himalayas" ? directApplyUrl(job.description) : null;
+  const cta = applyCta(job.source, job.applicationUrl);
   const onHimalayas = (() => {
     try {
       return new URL(job.applicationUrl).hostname.endsWith("himalayas.app");
@@ -201,7 +203,7 @@ export default async function JobDetailPage({
                         : "bg-[var(--accent)] text-[var(--bg)] hover:brightness-110"
                     }`}
                   >
-                    {onHimalayas ? "Apply on Himalayas" : "Apply now"}
+                    {cta.label}
                   </a>
                 </>
               )}
@@ -221,6 +223,20 @@ export default async function JobDetailPage({
                   Listing data from{" "}
                   <a href="https://himalayas.app" className="underline" target="_blank" rel="noopener noreferrer">
                     Himalayas
+                  </a>
+                  .
+                </p>
+              )}
+              {cta.sourceName && job.source !== "himalayas" && (
+                <p className="text-xs leading-relaxed text-[var(--muted)]">
+                  Listing data from{" "}
+                  <a
+                    href={job.applicationUrl}
+                    className="underline"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {cta.sourceName}
                   </a>
                   .
                 </p>
