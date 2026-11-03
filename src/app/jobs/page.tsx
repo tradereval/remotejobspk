@@ -1,246 +1,90 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { AskBox } from "@/components/ask-box";
 import { JobCard } from "@/components/job-card";
-import { getCurrentUser, isPremium } from "@/lib/auth";
+import { jobsAskPath, matchAsk } from "@/lib/ask";
+import { destinationFor, getCurrentUser, profileComplete } from "@/lib/auth";
 import { listJobs } from "@/lib/jobs";
-import {
-  EMPLOYMENT_TYPES,
-  JOB_CATEGORY_CHIPS,
-  type Eligibility,
-} from "@/lib/types";
 
 type SearchParams = Promise<{
-  q?: string;
-  eligibility?: string;
-  category?: string;
-  seniority?: string;
-  employmentType?: string;
-  verified?: string;
-  beginners?: string;
+  ask?: string;
   page?: string;
 }>;
 
 export default async function JobsPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
+  const ask = sp.ask?.trim() || "";
   const user = await getCurrentUser();
-  const premium = await isPremium(user);
-  const activeQ = sp.q?.trim() || undefined;
-  const activeCategory = sp.category?.trim() || undefined;
-  const activeType = sp.employmentType?.trim() || undefined;
 
-  const filters = {
-    q: activeQ,
-    eligibility: (sp.eligibility as Eligibility | "pk_ready" | undefined) || "pk_ready",
-    category: activeCategory,
-    seniority: sp.seniority,
-    employmentType: activeType,
-    verifiedOnly: premium && sp.verified === "1",
-    beginners: premium && sp.beginners === "1",
-    page: Number(sp.page || "1"),
-  };
-
-  const { jobs, total, page, totalPages } = await listJobs(filters, { premium });
-
-  function chipHref(category?: string) {
-    const params = new URLSearchParams();
-    if (activeQ) params.set("q", activeQ);
-    if (filters.eligibility) params.set("eligibility", String(filters.eligibility));
-    if (sp.seniority) params.set("seniority", sp.seniority);
-    if (activeType) params.set("employmentType", activeType);
-    if (category) params.set("category", category);
-    if (premium && sp.verified === "1") params.set("verified", "1");
-    if (premium && sp.beginners === "1") params.set("beginners", "1");
-    const qs = params.toString();
-    return qs ? `/jobs?${qs}` : "/jobs";
+  if (ask) {
+    if (!user) redirect(`/signup?ask=${encodeURIComponent(ask.slice(0, 500))}`);
+    if (!user.emailVerifiedAt || !profileComplete(user)) {
+      redirect(destinationFor(user, jobsAskPath(ask.slice(0, 500))));
+    }
+    const { intent, jobs, total, payMet } = await matchAsk(ask);
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-10">
+        <AskBox variant="page" defaultValue={ask} />
+        <div className="mt-8 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="font-[family-name:var(--font-display)] text-4xl">
+              {payMet ? "Your matches" : "Same kind of role"}
+            </h1>
+            <p className="mt-2 text-[var(--muted)]">{intent.summary}</p>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              {total === 0
+                ? "Nothing on the board is that role. A different title, language, or country was left off."
+                : payMet
+                  ? `${total} remote ${total === 1 ? "role" : "roles"} fit the work you described. Showing ${jobs.length}.`
+                  : `No ${intent.roleLabel} listing publishes ${intent.minMonthlyUsd ? `$${intent.minMonthlyUsd.toLocaleString()}/month` : "that pay"}. These ${jobs.length} are the same kind of work, with the pay they actually list.`}
+            </p>
+          </div>
+          <Link href="/jobs" className="text-sm text-[var(--accent)] underline">
+            See all jobs
+          </Link>
+        </div>
+        <div className="mt-6 rounded-2xl border border-[var(--line)] bg-white/80 px-4">
+          {jobs.length === 0 ? (
+            <p className="py-12 text-center text-[var(--muted)]">
+              Try a nearby pay, or{" "}
+              <Link href="/jobs" className="text-[var(--accent)] underline">
+                see all remote jobs
+              </Link>
+              .
+            </p>
+          ) : (
+            jobs.map((job) => <JobCard key={job.id} job={job} />)
+          )}
+        </div>
+      </div>
+    );
   }
+
+  const page = Math.max(1, Number(sp.page || "1") || 1);
+  const { jobs, total, totalPages } = await listJobs({ page });
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
-      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <AskBox variant="page" />
+      <div className="mt-8 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-[family-name:var(--font-display)] text-4xl">Remote jobs</h1>
+          <h1 className="font-[family-name:var(--font-display)] text-4xl">All remote jobs</h1>
           <p className="mt-2 text-[var(--muted)]">
-            {total} openings · Pakistan-eligible and worldwide by default
+            {total} openings from around the world, for people in Pakistan. USD when pay is listed.
           </p>
         </div>
-        {!premium && (
-          <Link href="/pricing" className="text-sm text-[var(--accent)] hover:underline">
-            Unlock verified filters & alerts →
-          </Link>
-        )}
       </div>
-
-      {user?.specialty && !activeQ && (
-        <div className="mb-6 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-sm">
-          Your specialty is <strong>{user.specialty}</strong>.{" "}
-          <Link
-            href={`/jobs?q=${encodeURIComponent(user.specialty)}`}
-            className="font-medium text-[var(--accent)] underline"
-          >
-            Show matching jobs
-          </Link>{" "}
-          or browse everything below.
-        </div>
-      )}
-
-      {user && (!user.specialty || !user.city) && (
-        <div className="mb-6 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-4 py-3 text-sm">
-          Complete your profile (city, qualification, specialty) so we can suggest better fits.{" "}
-          <Link href="/account" className="font-medium text-[var(--accent)] underline">
-            Update profile
-          </Link>
-        </div>
-      )}
-
-      <div className="mb-4 flex flex-wrap gap-2">
-        <Link
-          href={chipHref(undefined)}
-          className={`rounded-full border px-3 py-1.5 text-sm ${
-            !activeCategory
-              ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--bg)]"
-              : "border-[var(--line)] bg-white/80 text-[var(--muted)] hover:border-[var(--ink)]"
-          }`}
-        >
-          All categories
-        </Link>
-        {JOB_CATEGORY_CHIPS.map((cat) => (
-          <Link
-            key={cat}
-            href={chipHref(cat)}
-            className={`rounded-full border px-3 py-1.5 text-sm ${
-              activeCategory === cat
-                ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--bg)]"
-                : "border-[var(--line)] bg-white/80 text-[var(--muted)] hover:border-[var(--ink)]"
-            }`}
-          >
-            {cat}
-          </Link>
-        ))}
-      </div>
-
-      <form className="mb-8 grid gap-3 rounded-2xl border border-[var(--line)] bg-white/70 p-4 sm:grid-cols-4">
-        <input
-          name="q"
-          defaultValue={activeQ || ""}
-          placeholder="Search title, company, skill"
-          className="rounded-xl border border-[var(--line)] bg-white px-3 py-2 sm:col-span-2"
-        />
-        <select
-          name="eligibility"
-          defaultValue={filters.eligibility}
-          className="rounded-xl border border-[var(--line)] bg-white px-3 py-2"
-        >
-          <option value="pk_ready">Pakistan + Worldwide</option>
-          <option value="pakistan">Accepts Pakistan</option>
-          <option value="worldwide">Worldwide</option>
-          <option value="unknown">Unverified</option>
-        </select>
-        <select
-          name="seniority"
-          defaultValue={sp.seniority || ""}
-          className="rounded-xl border border-[var(--line)] bg-white px-3 py-2"
-        >
-          <option value="">Any seniority</option>
-          <option value="entry">Entry</option>
-          <option value="mid">Mid</option>
-          <option value="senior">Senior</option>
-          <option value="lead">Lead</option>
-        </select>
-        <select
-          name="employmentType"
-          defaultValue={activeType || ""}
-          className="rounded-xl border border-[var(--line)] bg-white px-3 py-2 sm:col-span-2"
-        >
-          <option value="">Any job type</option>
-          {EMPLOYMENT_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-        <input type="hidden" name="category" value={activeCategory || ""} />
-        <label
-          className={`flex items-center gap-2 text-sm sm:col-span-1 ${premium ? "" : "opacity-60"}`}
-        >
-          <input
-            type="checkbox"
-            name="verified"
-            value="1"
-            disabled={!premium}
-            defaultChecked={premium && sp.verified === "1"}
-          />
-          Verified only
-          {!premium && (
-            <Link href="/pricing" className="rounded-full bg-[var(--panel)] px-2 py-0.5 text-xs text-[var(--accent)]">
-              Premium
-            </Link>
-          )}
-        </label>
-        <label
-          className={`flex items-center gap-2 text-sm sm:col-span-1 ${premium ? "" : "opacity-60"}`}
-        >
-          <input
-            type="checkbox"
-            name="beginners"
-            value="1"
-            disabled={!premium}
-            defaultChecked={premium && sp.beginners === "1"}
-          />
-          Accepts beginners
-          {!premium && (
-            <Link href="/pricing" className="rounded-full bg-[var(--panel)] px-2 py-0.5 text-xs text-[var(--accent)]">
-              Premium
-            </Link>
-          )}
-        </label>
-        <button
-          type="submit"
-          className="rounded-xl bg-[var(--ink)] px-4 py-2 text-[var(--bg)] hover:bg-[var(--accent)] sm:col-span-4 sm:justify-self-start"
-        >
-          Filter
-        </button>
-      </form>
-
-      <div className="rounded-2xl border border-[var(--line)] bg-white/80 px-4">
+      <div className="mt-6 rounded-2xl border border-[var(--line)] bg-white/80 px-4">
         {jobs.length === 0 ? (
-          <div className="space-y-3 py-12 text-center text-[var(--muted)]">
-            {activeQ || sp.eligibility || sp.seniority || activeCategory || activeType ? (
-              <>
-                <p>
-                  No openings match
-                  {activeQ ? (
-                    <>
-                      {" "}
-                      “<strong className="text-[var(--ink)]">{activeQ}</strong>”
-                    </>
-                  ) : (
-                    " these filters"
-                  )}
-                  .
-                </p>
-                <p>
-                  <Link href="/jobs" className="text-[var(--accent)] underline">
-                    Clear search and show all jobs
-                  </Link>
-                </p>
-              </>
-            ) : (
-              <p>
-                No jobs in the database yet. An admin needs to run Import from the Admin page.
-              </p>
-            )}
-          </div>
+          <p className="py-12 text-center text-[var(--muted)]">No remote jobs yet.</p>
         ) : (
           jobs.map((job) => <JobCard key={job.id} job={job} />)
         )}
       </div>
-
       {totalPages > 1 && (
         <div className="mt-6 flex items-center justify-center gap-3">
           {page > 1 && (
-            <Link
-              href={`/jobs?${new URLSearchParams({ ...sp, page: String(page - 1) } as Record<string, string>).toString()}`}
-              className="rounded-full border border-[var(--line)] px-4 py-2 text-sm"
-            >
+            <Link href={`/jobs?page=${page - 1}`} className="rounded-full border border-[var(--line)] px-4 py-2 text-sm">
               Previous
             </Link>
           )}
@@ -248,10 +92,7 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
             Page {page} / {totalPages}
           </span>
           {page < totalPages && (
-            <Link
-              href={`/jobs?${new URLSearchParams({ ...sp, page: String(page + 1) } as Record<string, string>).toString()}`}
-              className="rounded-full border border-[var(--line)] px-4 py-2 text-sm"
-            >
+            <Link href={`/jobs?page=${page + 1}`} className="rounded-full border border-[var(--line)] px-4 py-2 text-sm">
               Next
             </Link>
           )}

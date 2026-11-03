@@ -26,6 +26,7 @@ type HimalayasJob = {
 
 type HimalayasResponse = {
   jobs?: HimalayasJob[];
+  totalCount?: number;
 };
 
 const BASE = "https://himalayas.app/jobs/api";
@@ -90,7 +91,7 @@ function asNumberList(value: Array<string | number> | string | null | undefined)
 }
 
 export async function importHimalayasJobs(options?: { maxPages?: number }) {
-  const maxPages = options?.maxPages ?? 15;
+  const maxPages = options?.maxPages ?? 120;
   let upserted = 0;
   let failed = 0;
   let expired = 0;
@@ -114,6 +115,9 @@ export async function importHimalayasJobs(options?: { maxPages?: number }) {
       const data = await fetchJson(buildSearchUrl(params));
       const jobs = data.jobs || [];
       if (!jobs.length) break;
+      console.log(
+        `Himalayas ${feed.country || "worldwide"} page ${page}: ${jobs.length} (catalog ${data.totalCount ?? "?"})`,
+      );
 
       for (const job of jobs) {
         const externalId = job.guid || job.applicationLink;
@@ -215,6 +219,7 @@ export async function importHimalayasJobs(options?: { maxPages?: number }) {
       }
 
       if (jobs.length < 20) break;
+      if (data.totalCount && page * 20 >= data.totalCount) break;
     }
   }
 

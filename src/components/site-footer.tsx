@@ -7,9 +7,12 @@ export function SiteFooter() {
         <p>
           © 2026 RemoteJobsPK · Job research platform. Employment is not guaranteed.
         </p>
-        <div className="flex gap-4">
-          <Link href="/pricing" className="hover:text-[var(--ink)]">
-            Pricing
+        <div className="flex flex-wrap gap-4">
+          <Link href="/privacy" className="hover:text-[var(--ink)]">
+            Privacy
+          </Link>
+          <Link href="/terms" className="hover:text-[var(--ink)]">
+            Terms
           </Link>
           <a href="mailto:hello@remotejobspk.com" className="hover:text-[var(--ink)]">
             hello@remotejobspk.com

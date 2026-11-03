@@ -8,6 +8,7 @@ export type JobFilters = {
   employmentType?: string;
   verifiedOnly?: boolean;
   beginners?: boolean;
+  salaryMin?: number;
   page?: number;
 };
 
@@ -62,13 +63,14 @@ export function formatSalary(job: {
   salaryPeriod?: string | null;
 }): string | null {
   if (!job.salaryMin && !job.salaryMax) return null;
-  const currency = job.salaryCurrency || "USD";
+  const currency = job.salaryCurrency?.toUpperCase() === "USD" ? "USD" : job.salaryCurrency || "";
   const period = job.salaryPeriod ? ` / ${job.salaryPeriod}` : "";
+  const prefix = currency ? `${currency} ` : "";
   if (job.salaryMin && job.salaryMax) {
-    return `${currency} ${job.salaryMin.toLocaleString()}–${job.salaryMax.toLocaleString()}${period}`;
+    return `${prefix}${job.salaryMin.toLocaleString()}–${job.salaryMax.toLocaleString()}${period}`;
   }
   const amount = job.salaryMin || job.salaryMax;
-  return `${currency} ${amount!.toLocaleString()}${period}`;
+  return `${prefix}${amount!.toLocaleString()}${period}`;
 }
 
 /** Plain-text preview for list cards. */

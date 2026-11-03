@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { AskBox } from "@/components/ask-box";
 import { getJobStats } from "@/lib/jobs";
 
 export default async function HomePage() {
-  let stats = { active: 0, pakistan: 0, worldwide: 0, verified: 0 };
+  let stats = { active: 0, pakistan: 0, worldwide: 0, verified: 0, categories: 0 };
   try {
     stats = await getJobStats();
   } catch {
@@ -21,35 +22,27 @@ export default async function HomePage() {
         />
         <div className="relative mx-auto max-w-6xl px-4 py-20 sm:py-28">
           <p className="mb-4 text-sm uppercase tracking-[0.2em] text-white/70">
-            Screened remote jobs · Built for Pakistan
+            Worldwide remote jobs · For people in Pakistan
           </p>
           <h1 className="max-w-3xl font-[family-name:var(--font-display)] text-4xl leading-tight sm:text-6xl">
-            Stop wasting weeks on jobs that never hire from Pakistan
+            Remote jobs from around the world, open to people in Pakistan
           </h1>
           <p className="mt-5 max-w-2xl text-lg text-white/80">
-            We screen every listing for Pakistan eligibility. Apply links stay free — Premium is Rs 999 /
-            $3 for faster filters and matching. Tell us your specialty; we match roles that actually fit.
+            Say the role, your experience, and the pay you need. You sign up free, then we open the
+            remote jobs that fit. Or skip ahead and see every listing.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link
-              href="/signup"
-              className="rounded-full bg-[var(--accent)] px-6 py-3 text-[var(--bg)] hover:brightness-110"
-            >
-              Create free profile
+          <AskBox />
+          <p className="mt-4 text-sm text-white/80">
+            <Link href="/jobs" className="underline">
+              See all jobs
             </Link>
-            <Link
-              href="/jobs"
-              className="rounded-full border border-white/40 px-6 py-3 text-white hover:bg-white/10"
-            >
-              Browse jobs
-            </Link>
-          </div>
+          </p>
         </div>
       </section>
 
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-14 sm:grid-cols-3">
-        <Stat label="Active listings" value={stats.active} />
-        <Stat label="Accepts Pakistan" value={stats.pakistan} />
+        <Stat label="Remote openings" value={stats.active} />
+        <Stat label="Categories" value={stats.categories} />
         <Stat label="Worldwide remote" value={stats.worldwide} />
       </section>
 
@@ -57,16 +50,16 @@ export default async function HomePage() {
         <h2 className="font-[family-name:var(--font-display)] text-3xl">How the business works</h2>
         <div className="mt-6 grid gap-6 sm:grid-cols-3">
           <Feature
-            title="1. Free to apply"
-            body="You never pay to open an apply link. Free accounts browse, filter by eligibility, and apply direct."
+            title="1. Free account"
+            body="Sign up and the whole board is open: every remote job, every category, filters, and saved searches. Nothing is locked."
           />
           <Feature
-            title="2. Premium for speed"
-            body="Pay for verified-only filters, beginner-friendly roles, and (soon) daily alerts — screening that saves you time, priced for Pakistan."
+            title="2. Apply on the employer"
+            body="You never pay to open an apply link. Himalayas applications continue on Himalayas, where they ask you to sign in before the form."
           />
           <Feature
-            title="3. We keep a CRM"
-            body="Every signup (name, phone, city, specialty) and every paying customer lands in our spreadsheet so we can help people manually too."
+            title="3. We keep a signup list"
+            body="Name, phone, city, and specialty land in our spreadsheet so we can see who joined and help people by hand."
           />
         </div>
       </section>
@@ -75,16 +68,16 @@ export default async function HomePage() {
         <h2 className="font-[family-name:var(--font-display)] text-3xl">Why RemoteJobsPK</h2>
         <div className="mt-6 grid gap-6 sm:grid-cols-3">
           <Feature
-            title="Eligibility first"
-            body="Every role is labeled Pakistan, Worldwide, Restricted, or Unverified — so you stop wasting hours on US/EU-only posts."
+            title="Worldwide, not local"
+            body="These are remote jobs from companies around the world that a person in Pakistan can take. Roles based in a Pakistani city are left off."
           />
           <Feature
             title="Profile matching"
             body="We collect specialty, qualification, and city so the board (and our team) can point you at better-fit openings."
           />
           <Feature
-            title="Honest Premium"
-            body="You’re not buying the job. You’re buying screening, filters, and alerts — Live vs Soon is labeled on Pricing."
+            title="Full access"
+            body="Filters, categories, and saved searches are included with a free account. Payment is not part of the product right now."
           />
         </div>
       </section>

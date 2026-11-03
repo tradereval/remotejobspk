@@ -11,9 +11,10 @@ import {
 } from "@/lib/types";
 
 export function JobCard({ job }: { job: Job }) {
-  const categories = parseJsonArray(job.categories)
-    .filter((c) => c !== job.employmentType)
-    .slice(0, 4);
+  const categories = [...new Set(parseJsonArray(job.categories).filter((c) => c !== job.employmentType))].slice(
+    0,
+    4,
+  );
   const salary = formatSalary(job);
   const preview = jobPreview(job);
   const locations = formatLocations(job.locationRestrictions);

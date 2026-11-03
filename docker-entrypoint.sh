@@ -29,7 +29,7 @@ echo "Active jobs in DB: ${JOB_COUNT} (missing employmentType: ${MISSING_META})"
 # Only import when board is thin or meta is missing — never block HTTP on boot.
 # RUN_IMPORT=true still forces a background refresh after the app is already up.
 if [ "${RUN_IMPORT:-false}" = "true" ] \
-  || [ "${JOB_COUNT:-0}" -lt "${MIN_JOBS_BEFORE_IMPORT:-50}" ] \
+  || [ "${JOB_COUNT:-0}" -lt "${MIN_JOBS_BEFORE_IMPORT:-1500}" ] \
   || [ "${MISSING_META:-9999}" -gt "${MAX_MISSING_JOB_META:-40}" ]; then
   echo "Importing jobs in background (full board / meta backfill)..."
   npx tsx scripts/import-jobs.ts || true

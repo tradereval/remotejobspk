@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     template: "%s · RemoteJobsPK",
   },
   description:
-    "Researched remote jobs accepting Pakistan-based or worldwide applicants. Free browse and apply. Premium alerts and verified filters.",
+    "Worldwide remote jobs people in Pakistan can apply for. Free account, full access to every listing and filter.",
 };
 
 export default function RootLayout({

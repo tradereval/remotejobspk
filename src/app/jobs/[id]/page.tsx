@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CompanyProfile } from "@/components/company-profile";
 import { EligibilityBadge } from "@/components/eligibility-badge";
+import { JobActions } from "@/components/job-actions";
+import { companyIntro, directApplyUrl, himalayasCompanyUrl, isOffBoard } from "@/lib/board-rules";
 import { prisma } from "@/lib/db";
+import { buildJobWhere } from "@/lib/jobs";
 import {
   cleanJobDescriptionHtml,
   formatDateLabel,
@@ -14,12 +18,40 @@ import {
 
 type Params = Promise<{ id: string }>;
 
-export default async function JobDetailPage({ params }: { params: Params }) {
+export default async function JobDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: Promise<{ reported?: string }>;
+}) {
+  const sp = await searchParams;
   const { id } = await params;
   const job = await prisma.job.findUnique({ where: { id } });
-  if (!job || !job.isActive) notFound();
+  if (!job || !job.isActive || isOffBoard(job)) notFound();
 
-  const categories = parseJsonArray(job.categories);
+  const otherRoles = await prisma.job.findMany({
+    where: {
+      ...buildJobWhere({ eligibility: "pk_ready" }),
+      company: job.company,
+      id: { not: job.id },
+    },
+    orderBy: [{ publishedAt: "desc" }],
+    take: 5,
+    select: { id: true, title: true },
+  });
+  const intro = companyIntro(job.description, job.company);
+  const companyUrl = himalayasCompanyUrl(job.applicationUrl);
+  const employerApply = directApplyUrl(job.description);
+  const onHimalayas = (() => {
+    try {
+      return new URL(job.applicationUrl).hostname.endsWith("himalayas.app");
+    } catch {
+      return false;
+    }
+  })();
+
+  const categories = [...new Set(parseJsonArray(job.categories))];
   const salary = formatSalary(job);
   const locations = formatLocations(job.locationRestrictions);
   const timezones = formatTimezones(job.timezoneRestrictions);
@@ -46,6 +78,11 @@ export default async function JobDetailPage({ params }: { params: Params }) {
       <Link href="/jobs" className="text-sm text-[var(--muted)] hover:text-[var(--ink)]">
         ← Back to jobs
       </Link>
+      {sp.reported && (
+        <p className="mt-4 rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-sm">
+          Report received. We review flagged listings from the admin queue.
+        </p>
+      )}
 
       <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
         <div className="min-w-0 flex-1 space-y-5">
@@ -91,6 +128,16 @@ export default async function JobDetailPage({ params }: { params: Params }) {
             </div>
           )}
 
+          <CompanyProfile
+            company={job.company}
+            logo={job.companyLogo}
+            intro={intro}
+            hiringFrom={locations}
+            pay={salary}
+            otherRoles={otherRoles}
+            companyUrl={companyUrl}
+          />
+
           <div className="prose-job rounded-2xl border border-[var(--line)] bg-white/80 p-6">
             <h2 className="!mt-0 font-[family-name:var(--font-display)] text-2xl text-[var(--ink)]">
               About this role
@@ -122,7 +169,8 @@ export default async function JobDetailPage({ params }: { params: Params }) {
               ))}
             </dl>
 
-            <div className="mt-5">
+            <div className="mt-5 space-y-4">
+              <JobActions jobId={job.id} />
               {isDemoApply ? (
                 <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                   Placeholder listing —{" "}
@@ -132,14 +180,50 @@ export default async function JobDetailPage({ params }: { params: Params }) {
                   .
                 </p>
               ) : (
-                <a
-                  href={job.applicationUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex w-full items-center justify-center rounded-full bg-[var(--accent)] px-6 py-3 text-[var(--bg)] hover:brightness-110"
-                >
-                  Apply now
-                </a>
+                <>
+                  {employerApply && (
+                    <a
+                      href={employerApply}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex w-full items-center justify-center rounded-full bg-[var(--accent)] px-6 py-3 text-[var(--bg)] hover:brightness-110"
+                    >
+                      Apply on company site
+                    </a>
+                  )}
+                  <a
+                    href={job.applicationUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`inline-flex w-full items-center justify-center rounded-full px-6 py-3 ${
+                      employerApply
+                        ? "border border-[var(--ink)] text-[var(--ink)] hover:bg-[var(--ink)] hover:text-[var(--bg)]"
+                        : "bg-[var(--accent)] text-[var(--bg)] hover:brightness-110"
+                    }`}
+                  >
+                    {onHimalayas ? "Apply on Himalayas" : "Apply now"}
+                  </a>
+                </>
+              )}
+              {onHimalayas && (
+                <p className="text-xs leading-relaxed text-[var(--muted)]">
+                  This employer takes applications on{" "}
+                  <a href="https://himalayas.app" className="underline" target="_blank" rel="noopener noreferrer">
+                    Himalayas
+                  </a>
+                  . Their page asks you to verify your email and sign in before the form. The jobs feed
+                  publishes that Himalayas link and no separate employer form
+                  {employerApply ? ", except the company-site link above" : ""}.
+                </p>
+              )}
+              {job.source === "himalayas" && !onHimalayas && (
+                <p className="text-xs text-[var(--muted)]">
+                  Listing data from{" "}
+                  <a href="https://himalayas.app" className="underline" target="_blank" rel="noopener noreferrer">
+                    Himalayas
+                  </a>
+                  .
+                </p>
               )}
             </div>
           </div>

@@ -1,3 +1,4 @@
+import { textIsOffBoard } from "./board-rules";
 import type { Eligibility } from "./types";
 
 const PK_POSITIVE = [
@@ -41,6 +42,9 @@ export function scoreEligibility(input: {
   forceCountry?: string | null;
 }): { eligibility: Eligibility; needsReview: boolean } {
   if (input.forceCountry?.toLowerCase() === "pk" || input.forceCountry?.toLowerCase() === "pakistan") {
+    if (textIsOffBoard(`${input.title || ""}\n${input.description || ""}`)) {
+      return { eligibility: "restricted", needsReview: true };
+    }
     return { eligibility: "pakistan", needsReview: false };
   }
 
@@ -89,7 +93,7 @@ function flatten(value: string[] | string | null | undefined): string {
 export function eligibilityLabel(eligibility: Eligibility): string {
   switch (eligibility) {
     case "pakistan":
-      return "Accepts Pakistan";
+      return "Open to Pakistan";
     case "worldwide":
       return "Worldwide remote";
     case "restricted":

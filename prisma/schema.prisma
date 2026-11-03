@@ -17,12 +17,18 @@ model User {
   state          String?
   qualification  String?
   specialty      String?
-  role           String         @default("user") // user | admin
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  subscription   Subscription?
-  savedJobs      SavedJob[]
-  savedSearches  SavedSearch[]
+  role            String         @default("user") // user | admin
+  emailVerifiedAt DateTime?
+  googleSub       String?        @unique
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  subscription    Subscription?
+  savedJobs       SavedJob[]
+  savedSearches   SavedSearch[]
+  passwordResets  PasswordReset[]
+  emailVerifications EmailVerification[]
+  jobReports      JobReport[]
+  payments        Payment[]
 }
 
 model Subscription {
@@ -70,6 +76,7 @@ model Job {
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
   savedBy           SavedJob[]
+  reports           JobReport[]
 
   @@unique([source, externalId])
   @@index([isActive, eligibility])
@@ -83,6 +90,7 @@ model SavedJob {
   jobId     String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  status    String   @default("saved") // saved | applied
   createdAt DateTime @default(now())
 
   @@unique([userId, jobId])
@@ -95,8 +103,63 @@ model SavedSearch {
   name            String?
   queryJson       String // JSON filters
   alertFrequency  String   @default("daily") // off | daily | instant
+  lastAlertedAt   DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+model EmailVerification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model JobReport {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email     String?
+  reason    String
+  details   String?
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([resolved, createdAt])
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tracker   String   @unique
+  plan      String
+  currency  String
+  amount    Int
+  status    String   @default("pending") // pending | paid | canceled | failed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 /** Always-on CRM log (works even when Google Sheet webhook is not configured). */

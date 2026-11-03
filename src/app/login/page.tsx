@@ -1,16 +1,20 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createSession, getCurrentUser, verifyPassword } from "@/lib/auth";
+import { createSession, destinationFor, getCurrentUser, setPendingVerification, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { sendAccountVerification } from "@/lib/email";
+import { GoogleAuthLink } from "@/components/google-auth-link";
+import { safeNextPath } from "@/lib/site";
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 }) {
-  const user = await getCurrentUser();
-  if (user) redirect("/account");
   const sp = await searchParams;
+  const next = safeNextPath(sp.next, "");
+  const user = await getCurrentUser();
+  if (user) redirect(destinationFor(user, next || "/account"));
 
   return (
     <div className="mx-auto max-w-md px-4 py-12">
@@ -24,6 +28,7 @@ export default async function LoginPage({
           placeholder="Email"
           className="w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
         />
+        <input type="hidden" name="next" value={next} />
         <input
           name="password"
           type="password"
@@ -35,6 +40,14 @@ export default async function LoginPage({
           Log in
         </button>
       </form>
+      <div className="mt-4">
+        <GoogleAuthLink next={next || "/account"} label="Continue with Google" />
+      </div>
+      <p className="mt-4 text-sm text-[var(--muted)]">
+        <Link href="/forgot" className="underline">
+          Forgot password?
+        </Link>
+      </p>
       <p className="mt-4 text-sm text-[var(--muted)]">
         No account? <Link href="/signup" className="underline">Sign up</Link>
       </p>
@@ -49,9 +62,18 @@ async function loginAction(formData: FormData) {
     .toLowerCase();
   const password = String(formData.get("password") || "");
   const user = await prisma.user.findUnique({ where: { email } });
+  const next = safeNextPath(String(formData.get("next") || ""));
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
-    redirect("/login?error=Invalid%20email%20or%20password");
+    redirect(`/login?error=Invalid%20email%20or%20password&next=${encodeURIComponent(next)}`);
+  }
+  if (!user.emailVerifiedAt) {
+    await setPendingVerification(user.id);
+    const mailed = await sendAccountVerification(user, next || "/account");
+    const params = new URLSearchParams({ next: next || "/account" });
+    if (mailed.sent) params.set("sent", "1");
+    else params.set("error", "We could not send the email. Write to hello@remotejobspk.com");
+    redirect(`/verify-email?${params.toString()}`);
   }
   await createSession(user);
-  redirect("/account");
+  redirect(destinationFor(user, next || "/account"));
 }

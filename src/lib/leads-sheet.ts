@@ -1,6 +1,11 @@
 import { prisma } from "./db";
 
-export type LeadEventType = "signup" | "profile_update" | "premium_granted" | "premium_paid";
+export type LeadEventType =
+  | "signup"
+  | "profile_update"
+  | "premium_granted"
+  | "premium_paid"
+  | "email_sent";
 
 export type LeadPayload = {
   event: LeadEventType;
@@ -77,6 +82,26 @@ export async function syncLeadToSpreadsheet(payload: LeadPayload): Promise<{ ok:
   return { ok: true, skipped: !url };
 }
 
+export type LeadUser = {
+  id: string;
+  email: string;
+  name?: string | null;
+  phone?: string | null;
+  city?: string | null;
+  state?: string | null;
+  qualification?: string | null;
+  specialty?: string | null;
+  subscription?: { status?: string | null; plan?: string | null } | null;
+};
+
+export async function logOutboundEmail(user: LeadUser | null, notes: string) {
+  if (user) {
+    await syncLeadToSpreadsheet(userToLeadPayload(user, "email_sent", notes));
+    return;
+  }
+  await syncLeadToSpreadsheet({ event: "email_sent", notes });
+}
+
 export function userToLeadPayload(
   user: {
     id: string;
@@ -102,7 +127,7 @@ export function userToLeadPayload(
     state: user.state,
     qualification: user.qualification,
     specialty: user.specialty,
-    plan: user.subscription?.plan || null,
+    plan: user.subscription?.plan || "free",
     subscriptionStatus: user.subscription?.status || "inactive",
     notes: notes || null,
   };

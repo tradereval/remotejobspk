@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { getCurrentUser, isPremium } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 
 export async function SiteHeader() {
   const user = await getCurrentUser();
-  const premium = await isPremium(user);
 
   return (
     <header className="border-b border-[var(--line)] bg-[var(--bg)]/90 backdrop-blur sticky top-0 z-40">
@@ -15,13 +14,10 @@ export async function SiteHeader() {
           <Link href="/jobs" className="hover:text-[var(--ink)]">
             Jobs
           </Link>
-          <Link href="/pricing" className="hover:text-[var(--ink)]">
-            Pricing
-          </Link>
           {user ? (
             <>
               <Link href="/account" className="hover:text-[var(--ink)]">
-                Account{premium ? " · Premium" : ""}
+                Account
               </Link>
               {user.role === "admin" && (
                 <Link href="/admin" className="hover:text-[var(--ink)]">

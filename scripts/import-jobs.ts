@@ -2,7 +2,7 @@ import { importHimalayasJobs } from "../src/lib/himalayas";
 
 async function main() {
   console.log("Importing Himalayas jobs (PK + worldwide)...");
-  const result = await importHimalayasJobs({ maxPages: 25 });
+  const result = await importHimalayasJobs({ maxPages: 120 });
   console.log(result);
 }
 

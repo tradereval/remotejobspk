@@ -4,6 +4,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { importHimalayasJobs } from "@/lib/himalayas";
 import { revalidatePath } from "next/cache";
+import { sendDueAlerts } from "@/lib/alerts";
+import { REPLY_TEMPLATES, sendReceipt, sendReply, type ReplyTemplateId } from "@/lib/email";
 import { syncLeadToSpreadsheet, userToLeadPayload } from "@/lib/leads-sheet";
 
 export default async function AdminPage({
@@ -16,7 +18,7 @@ export default async function AdminPage({
   if (user.role !== "admin") redirect("/account");
   const sp = await searchParams;
 
-  const [active, needsReview, users, leadEvents] = await Promise.all([
+  const [active, needsReview, users, leadEvents, reports] = await Promise.all([
     prisma.job.count({ where: { isActive: true } }),
     prisma.job.count({ where: { needsReview: true, isActive: true } }),
     prisma.user.findMany({
@@ -27,6 +29,12 @@ export default async function AdminPage({
     prisma.leadEvent.findMany({
       take: 40,
       orderBy: { createdAt: "desc" },
+    }),
+    prisma.jobReport.findMany({
+      where: { resolved: false },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+      include: { job: true },
     }),
   ]);
 
@@ -57,6 +65,11 @@ export default async function AdminPage({
               Run import now
             </button>
           </form>
+          <form action={runAlerts}>
+            <button type="submit" className="rounded-full border border-[var(--ink)] px-4 py-2 text-sm">
+              Send due alerts
+            </button>
+          </form>
           <form action={removeDemoJobs}>
             <button type="submit" className="rounded-full border border-[var(--ink)] px-4 py-2 text-sm">
               Hide example.com demo jobs
@@ -69,7 +82,8 @@ export default async function AdminPage({
         <h2 className="font-[family-name:var(--font-display)] text-xl">CSV bulk upload</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">
           Columns: title, company, applicationUrl, eligibility, seniority, description, acceptsBeginners,
-          isVerified
+          isVerified. Manual rows are the second source, for roles you check yourself. Himalayas stays the
+          automatic feed.
         </p>
         <form action={uploadCsv} className="mt-4 space-y-3">
           <textarea
@@ -112,6 +126,73 @@ export default async function AdminPage({
           ))}
           {reviewJobs.length === 0 && <p className="text-sm text-[var(--muted)]">Queue empty.</p>}
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-[var(--line)] bg-white/80 p-5">
+        <h2 className="font-[family-name:var(--font-display)] text-xl">Reported listings</h2>
+        <div className="mt-4 divide-y divide-[var(--line)] text-sm">
+          {reports.length === 0 && <p className="text-[var(--muted)]">No open reports.</p>}
+          {reports.map((report) => (
+            <div key={report.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-medium">
+                  {report.reason} · {report.job.title}
+                </p>
+                <p className="text-xs text-[var(--muted)]">
+                  {report.job.company} · {report.email || "no email"} · {report.details || "no details"}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <form action={hideJob.bind(null, report.jobId)}>
+                  <button className="rounded-full border border-rose-300 px-3 py-1 text-xs text-rose-700">Hide job</button>
+                </form>
+                <form action={resolveReport.bind(null, report.id)}>
+                  <button className="rounded-full border px-3 py-1 text-xs">Resolve</button>
+                </form>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-[var(--line)] bg-white/80 p-5">
+        <h2 className="font-[family-name:var(--font-display)] text-xl">Reply from hello@</h2>
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          Sends through Resend when RESEND_API_KEY is set, and logs the send on the CRM. Copy a template
+          into Gmail when mail is not configured.
+        </p>
+        <div className="mt-3 space-y-2 text-sm">
+          {Object.entries(REPLY_TEMPLATES).map(([id, template]) => (
+            <p key={id}>
+              <span className="font-medium">{template.label}:</span> {template.body}
+            </p>
+          ))}
+        </div>
+        <form action={sendAdminReply} className="mt-4 grid gap-3">
+          <input
+            name="email"
+            type="email"
+            required
+            placeholder="Their email"
+            className="rounded-xl border border-[var(--line)] bg-white px-3 py-2"
+          />
+          <select name="template" className="rounded-xl border border-[var(--line)] bg-white px-3 py-2">
+            {Object.entries(REPLY_TEMPLATES).map(([id, template]) => (
+              <option key={id} value={id}>
+                {template.label}
+              </option>
+            ))}
+          </select>
+          <textarea
+            name="extra"
+            rows={3}
+            placeholder="Optional extra line"
+            className="rounded-xl border border-[var(--line)] bg-white px-3 py-2"
+          />
+          <button type="submit" className="justify-self-start rounded-full bg-[var(--ink)] px-4 py-2 text-[var(--bg)]">
+            Send reply
+          </button>
+        </form>
       </section>
 
       <section className="rounded-2xl border border-[var(--line)] bg-white/80 p-5">
@@ -196,6 +277,24 @@ async function runImport() {
   redirect(`/admin?msg=${encodeURIComponent(`Imported ${result.upserted} jobs (${result.uniqueSeen} unique)`)}`);
 }
 
+async function runAlerts() {
+  "use server";
+  const user = await getCurrentUser();
+  if (!user || user.role !== "admin") redirect("/login");
+  const result = await sendDueAlerts();
+  redirect(
+    `/admin?msg=${encodeURIComponent(`Alerts checked ${result.checked}, sent ${result.sent}, skipped ${result.skipped}`)}`,
+  );
+}
+
+async function resolveReport(reportId: string) {
+  "use server";
+  const user = await getCurrentUser();
+  if (!user || user.role !== "admin") redirect("/login");
+  await prisma.jobReport.update({ where: { id: reportId }, data: { resolved: true } });
+  revalidatePath("/admin");
+}
+
 async function removeDemoJobs() {
   "use server";
   const user = await getCurrentUser();
@@ -277,6 +376,7 @@ async function grantPremium(userId: string) {
     await syncLeadToSpreadsheet(
       userToLeadPayload(paid, "premium_granted", "Admin granted Premium 30d"),
     );
+    await sendReceipt(paid, "Premium Rs 999");
   }
   revalidatePath("/admin");
 }
@@ -339,6 +439,27 @@ async function uploadCsv(formData: FormData) {
   }
   revalidatePath("/jobs");
   redirect(`/admin?msg=${encodeURIComponent(`Uploaded ${count} manual jobs`)}`);
+}
+
+async function sendAdminReply(formData: FormData) {
+  "use server";
+  const admin = await getCurrentUser();
+  if (!admin || admin.role !== "admin") redirect("/login");
+  const email = String(formData.get("email") || "")
+    .trim()
+    .toLowerCase();
+  const template = String(formData.get("template") || "support") as ReplyTemplateId;
+  const extra = String(formData.get("extra") || "");
+  if (!email || !(template in REPLY_TEMPLATES)) redirect("/admin?msg=Missing%20reply%20fields");
+  const person = await prisma.user.findUnique({ where: { email }, include: { subscription: true } });
+  const result = await sendReply(
+    person || { id: "", email, name: null },
+    template,
+    extra,
+  );
+  redirect(
+    `/admin?msg=${encodeURIComponent(result.sent ? `Reply sent to ${email}` : `Mail is not configured. Copy the ${REPLY_TEMPLATES[template].label} template into Gmail for ${email}.`)}`,
+  );
 }
 
 function splitCsvLine(line: string): string[] {
