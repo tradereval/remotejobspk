@@ -27,6 +27,7 @@ type HimalayasJob = {
 type HimalayasResponse = {
   jobs?: HimalayasJob[];
   totalCount?: number;
+  nextCursor?: string;
 };
 
 type Feed = { country?: string; worldwide?: string };
@@ -35,12 +36,10 @@ type Counters = { upserted: number; failed: number; expired: number };
 
 const BASE = "https://himalayas.app/jobs/api";
 const PAGE_SIZE = 20;
+/** Stops a stuck browse cursor. The live catalog is well under this. */
+const BROWSE_LOOP_GUARD = 20000;
 let minGapMs = 1000;
 let nextAllowedAt = 0;
-
-async function sleep(ms: number) {
-  await new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 async function pace() {
   const wait = nextAllowedAt - Date.now();
@@ -57,6 +56,10 @@ function speedUp() {
   minGapMs = Math.max(1000, Math.floor(minGapMs * 0.95));
 }
 
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function fetchJson(url: string): Promise<HimalayasResponse> {
   const headers: HeadersInit = {
     Accept: "application/json",
@@ -70,7 +73,7 @@ async function fetchJson(url: string): Promise<HimalayasResponse> {
   for (let attempt = 0; attempt < 8; attempt++) {
     try {
       await pace();
-      const res = await fetch(url, { headers, cache: "no-store" });
+      const res = await fetch(url, { headers, cache: "no-store", signal: AbortSignal.timeout(25_000) });
       if (res.status === 429 || res.status === 502 || res.status === 503) {
         slowDown();
         const retryAfter = Number(res.headers.get("retry-after"));
@@ -88,7 +91,6 @@ async function fetchJson(url: string): Promise<HimalayasResponse> {
         throw new Error(`Himalayas API ${res.status}: ${text.slice(0, 180)}`);
       }
       if (text.trimStart().startsWith("<")) {
-        slowDown();
         const waitMs = Math.min(30_000, 1000 * 2 ** attempt);
         console.log(`Himalayas returned HTML, waiting ${waitMs}ms`);
         await sleep(waitMs);
@@ -110,6 +112,11 @@ async function fetchJson(url: string): Promise<HimalayasResponse> {
 function buildSearchUrl(params: Record<string, string>) {
   const q = new URLSearchParams(params);
   return `${BASE}/search?${q.toString()}`;
+}
+
+function buildBrowseUrl(params: Record<string, string>) {
+  const q = new URLSearchParams(params);
+  return `${BASE}?${q.toString()}`;
 }
 
 function parseDate(value: string | number | null | undefined): Date | null {
@@ -240,6 +247,7 @@ async function saveBatch(rows: Row[], counters: Counters) {
           update: data.update,
         }),
       ),
+      { maxWait: 30_000, timeout: 120_000 },
     );
     counters.upserted += prepared.length;
     counters.expired += prepared.filter((data) => data.isExpired).length;
@@ -349,13 +357,105 @@ async function importSearchFeed(
   return pages;
 }
 
-export async function importHimalayasJobs(options?: { maxPages?: number }) {
+/** Empty location restrictions mean worldwide. Any other country list is not open to Pakistan. */
+function classifyBrowse(job: HimalayasJob): { eligibility: Eligibility; needsReview: boolean } {
+  const scored = scoreEligibility({
+    locationRestrictions: job.locationRestrictions,
+    timezoneRestrictions: job.timezoneRestrictions,
+    description: `${job.excerpt || ""} ${job.description || ""}`,
+    title: job.title,
+  });
+  if (scored.eligibility === "restricted") return scored;
+
+  const locations = asStringList(job.locationRestrictions).map((value) => value.toLowerCase());
+  const openEnded =
+    locations.length === 0 ||
+    locations.some((loc) => loc.includes("worldwide") || loc.includes("anywhere") || loc === "global");
+  if (openEnded) return { eligibility: "worldwide", needsReview: false };
+  if (locations.some((loc) => loc === "pk" || loc.includes("pakistan"))) {
+    return { eligibility: "pakistan", needsReview: false };
+  }
+  return { eligibility: "restricted", needsReview: false };
+}
+
+async function importBrowseFeed(
+  seenGuids: Set<string>,
+  counters: Counters,
+  maxBrowsePages: number | undefined,
+) {
+  let cursor: string | undefined;
+  let pages = 0;
+  let reportedTotal: number | null = null;
+  let finished = false;
+  let prefetch: Promise<HimalayasResponse> | null = null;
+  const guard = maxBrowsePages ?? BROWSE_LOOP_GUARD;
+
+  const loadPage = (nextCursor?: string) => {
+    const params: Record<string, string> = { limit: String(PAGE_SIZE) };
+    if (nextCursor) params.cursor = nextCursor;
+    return fetchJson(buildBrowseUrl(params));
+  };
+
+  while (pages < guard) {
+    const data = prefetch ? await prefetch : await loadPage(cursor);
+    prefetch = null;
+    if (reportedTotal === null && typeof data.totalCount === "number") {
+      reportedTotal = data.totalCount;
+      console.log(`Himalayas browse catalog reported ${reportedTotal}`);
+    }
+    const jobs = data.jobs || [];
+    if (!jobs.length) {
+      finished = true;
+      break;
+    }
+    pages += 1;
+    const batch = takeNewJobs(jobs, seenGuids).map((job) => ({ job, ...classifyBrowse(job) }));
+    const next = data.nextCursor;
+    if (next && next !== cursor && pages < guard) prefetch = loadPage(next);
+    await saveBatch(batch, counters);
+    if (pages === 1 || pages % 25 === 0) {
+      console.log(
+        `Himalayas browse page ${pages}: new ${batch.length}, unique ${seenGuids.size}, upserted ${counters.upserted}, failed ${counters.failed}`,
+      );
+    }
+    if (!next || next === cursor) {
+      finished = true;
+      break;
+    }
+    cursor = next;
+  }
+
+  if (!finished && maxBrowsePages === undefined) {
+    console.error(`Himalayas browse stopped at safety guard of ${guard} pages with a cursor still set`);
+  }
+  console.log(`Himalayas browse done: pages ${pages}, unique ${seenGuids.size}, reported ${reportedTotal ?? "?"}`);
+  return { pages, reportedTotal };
+}
+
+export async function importHimalayasJobs(options?: { maxPages?: number; maxBrowsePages?: number }) {
   await tuneSqlite();
   const counters: Counters = { upserted: 0, failed: 0, expired: 0 };
   const seenGuids = new Set<string>();
+  const stored = await prisma.job.findMany({
+    where: { source: "himalayas" },
+    select: { externalId: true },
+  });
+  for (const row of stored) {
+    if (row.externalId) seenGuids.add(row.externalId);
+  }
+  if (seenGuids.size) console.log(`Himalayas resume: ${seenGuids.size} jobs already stored`);
 
   const pakistanPages = await importSearchFeed({ country: "PK" }, seenGuids, counters, options?.maxPages);
   const worldwidePages = await importSearchFeed({ worldwide: "true" }, seenGuids, counters, options?.maxPages);
+
+  let browsePages = 0;
+  let browseReportedTotal: number | null = null;
+  // A capped search (the admin button) stays a short refresh. A full import also walks /jobs/api.
+  if (options?.maxBrowsePages !== 0 && options?.maxPages === undefined) {
+    const browse = await importBrowseFeed(seenGuids, counters, options?.maxBrowsePages);
+    browsePages = browse.pages;
+    browseReportedTotal = browse.reportedTotal;
+  }
 
   const deactivate = await prisma.job.updateMany({
     where: {
@@ -372,5 +472,7 @@ export async function importHimalayasJobs(options?: { maxPages?: number }) {
     expiredMarked: counters.expired + deactivate.count,
     uniqueSeen: seenGuids.size,
     pagesWalked: pakistanPages + worldwidePages,
+    browsePages,
+    browseReportedTotal,
   };
 }
