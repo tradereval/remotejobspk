@@ -24,17 +24,31 @@ export default async function VerifyEmailPage({
   if (!user) redirect(`/login?next=${encodeURIComponent(next)}`);
   if (user.emailVerifiedAt) redirect(destinationFor(user, next));
 
+  const sendFailed = Boolean(sp.error);
+
   return (
     <div className="mx-auto max-w-lg px-4 py-12">
       <img src="/logo-signature.jpg" alt="RemoteJobsPK" className="mb-6 w-full max-w-sm" />
-      <h1 className="font-[family-name:var(--font-display)] text-3xl">Check your email</h1>
-      <p className="mt-3 text-sm text-[var(--muted)]">
-        We sent a welcome message to <strong className="text-[var(--ink)]">{user.email}</strong>. It
-        includes our terms and a <strong className="text-[var(--ink)]">Verify my email</strong> button.
-        Your matches open after that button is pressed, so a made-up address cannot get in.
-      </p>
-      {sp.sent && <p className="mt-3 text-sm text-[var(--accent)]">A new verification email is on its way.</p>}
-      {sp.error && <p className="mt-3 text-sm text-rose-700">{sp.error}</p>}
+      <h1 className="font-[family-name:var(--font-display)] text-3xl">
+        {sendFailed ? "The email did not send" : "Check your email"}
+      </h1>
+      {sendFailed ? (
+        <p className="mt-3 text-sm text-rose-700">
+          We could not send the welcome message to{" "}
+          <strong className="text-[var(--ink)]">{user.email}</strong>. {sp.error}
+        </p>
+      ) : (
+        <>
+          <p className="mt-3 text-sm text-[var(--muted)]">
+            We sent a welcome message to <strong className="text-[var(--ink)]">{user.email}</strong>. It
+            includes our terms and a <strong className="text-[var(--ink)]">Verify my email</strong> button.
+            Your matches open after that button is pressed, so a made-up address cannot get in.
+          </p>
+          {sp.sent && (
+            <p className="mt-3 text-sm text-[var(--accent)]">A new verification email is on its way.</p>
+          )}
+        </>
+      )}
       <form action={resendAction} className="mt-6">
         {ask && <input type="hidden" name="ask" value={ask} />}
         <input type="hidden" name="next" value={next} />
